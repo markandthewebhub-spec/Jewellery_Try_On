@@ -1,15 +1,14 @@
-# 3ds Max Wavefront OBJ Exporter v0.97b - (c)2007 guruware
-# File Created: 13.01.2012 14:48:55
+# 3ds Max Wavefront OBJ Exporter v0.99 - (c)2007 guruware
+# File Created: 26.12.2022 05:35:48
 
-newmtl 13093_gold_twisted_rope_bracelet
-	Ns 60.0000
+newmtl 20___Default
+	Ns 54.0000
 	Ni 1.5000
 	d 1.0000
 	Tr 0.0000
 	Tf 1.0000 1.0000 1.0000 
 	illum 2
-	Ka 0.9176 0.5451 0.2275
-	Kd 0.9176 0.5451 0.2275
-	Ks 0.6300 0.6300 0.6300
+	Ka 0.0000 0.2824 0.4824
+	Kd 0.0000 0.2824 0.4824
+	Ks 0.7830 0.7830 0.7830
 	Ke 0.0000 0.0000 0.0000
-	map_refl 13093_gold_twisted_rope_bracelet.jpg

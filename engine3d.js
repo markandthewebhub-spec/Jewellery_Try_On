@@ -84,7 +84,7 @@ const PLACE = {
   // fraction of face height. The pivot sits 0.55 above the chin, so this lands
   // the chain about (neckDrop - 0.55) of a face height below the chin.
   // Bigger = lower. Everything else hangs off this.
-  neckDrop: 1.00,
+  neckDrop: 0.50,
 
   // Where the head actually pivots when it nods: the atlanto-occipital joint,
   // roughly level with the ear canals and well back toward the spine. Measured
@@ -125,11 +125,13 @@ const PLACE = {
   // Must stay 0 while the neck mask is concentric with the chain — see updateNecklace.
   necklaceForward: 0,
 
-  // Neck mask geometry. It has to cover the neck itself — where the rear chain
-  // passes — and stop short of the pendant, which hangs in front of the chest
-  // and must never be cut.
-  neckMaskLength: 0.42,
-  neckMaskLift: 0.09,
+  // Neck mask geometry, in CHAIN RADII rather than face heights — the mask has
+  // to stay rigid against the chain, and the chain's own radius is the only
+  // measure that does not wobble with the tracking. It must cover the neck,
+  // where the rear chain passes, and stop short of the pendant hanging in front
+  // of the chest, which must never be cut.
+  neckMaskLength: 1.90,
+  neckMaskLift: 0.41,
 
   // Neck mask size, as a multiple of the chain's OWN wrap radius.
   // A wrapped chain lies on a cylinder, so the mask must be that same cylinder:
@@ -600,7 +602,7 @@ export class Engine3D {
 
     // Lighting
     this.ambient = new THREE.AmbientLight(0xffffff, Math.max(0.85 - ENV_MEAN_LUMINANCE, 0.1));
-    this.keyLight = new THREE.DirectionalLight(0xfff6ea, 1.0);
+    this.keyLight = new THREE.DirectionalLight(0xfff6ea, 1.15);
     this.fillLight = new THREE.DirectionalLight(0xeaf0ff, 0.40);
     this.rimLight = new THREE.DirectionalLight(0xffffff, 0.30);
     this.scene.add(this.ambient, this.keyLight, this.fillLight, this.rimLight);
@@ -1597,18 +1599,25 @@ export class Engine3D {
     const wide = wrapped ? PLACE.neckMaskWide : PLACE.neckMaskFitFlat;
     const deep = wrapped ? PLACE.neckMaskDeep : PLACE.neckMaskFitFlat;
 
-    // Ratios against the raw scale, so the mask inherits the smoothed size.
-    // Local X is across the neck and local Z is its depth — the basis was built
+    // Every figure below is in the NECKLACE's own units and multiplied by its
+    // smoothed scale, so the mask is welded to the chain and cannot drift from
+    // it. Anything divided by the raw per-frame scale would breathe against the
+    // smoothed scale the chain is actually drawn at, and the mask's top edge
+    // would slide over the clasp — which is the hook flashing into view mid-turn.
+    // Local X is across the neck and local Z is its depth: the basis was built
     // from the neck's own axis and forward, so the ellipse lands the right way round.
-    const inv = 1 / Math.max(scale, 1e-6);
-    const wideRatio = necklaceRadius * wide * inv;
-    const deepRatio = necklaceRadius * deep * inv;
-    const lengthRatio = faceHeight * PLACE.neckMaskLength * inv;
-    const liftRatio = faceHeight * PLACE.neckMaskLift * inv;
+    const half = openWidth * 0.5;
+    const wideRatio = half * wide;
+    const deepRatio = half * deep;
+    const lengthRatio = half * PLACE.neckMaskLength;
+    const liftRatio = half * PLACE.neckMaskLift;
+
+    // The chain's own axis, taken from the SMOOTHED pose for the same reason.
+    _v7.set(0, 1, 0).applyQuaternion(st.quaternion);
 
     _mPos.set(st.position.x, st.position.y, st.depth)
       // Ride up toward the jaw, clear of anything hanging below.
-      .addScaledVector(_n1, st.scale * liftRatio);
+      .addScaledVector(_v7, st.scale * liftRatio);
     _mScale.set(st.scale * wideRatio, st.scale * lengthRatio, st.scale * deepRatio);
     this._placeMask(this.occluders.neck, 'neck', _mPos, st.quaternion, _mScale, false);
 
@@ -3033,6 +3042,13 @@ function scrubNaNVertices(geometry, label) {
 // Average luminance of the probe built below, in LINEAR light — solid-angle weighted…
 const ENV_MEAN_LUMINANCE = 0.13;
 
+// ►► HOW BRIGHT THE JEWELLERY LOOKS ◄◄
+// Metal takes nearly all of its colour from what it reflects — at high metalness
+// the diffuse term is zero and the lights barely touch it — so this, not the
+// lamps, is the dial. 1.0 is physically neutral; above that the highlights clip
+// to white, which on polished gold reads as shine rather than as blown out.
+const ENV_INTENSITY = 1.35;
+
 // A small equirectangular studio probe, written pixel by pixel.
 function makeStudioEnvTexture() {
   const W = 64;
@@ -3147,7 +3163,7 @@ function defaultMetalMaterial() {
     color: 0xd4af37,
     metalness: 0.9,
     roughness: 0.25,
-    envMapIntensity: 1.0,
+    envMapIntensity: ENV_INTENSITY,
     side: THREE.DoubleSide,
   });
 }
@@ -3169,7 +3185,7 @@ function toPBRMaterial(src, options) {
     // Already PBR — respect it, and only make sure it fits the scene.
     src.side = THREE.DoubleSide;
     tuneTexture(src.map);
-    if (src.envMapIntensity === undefined) src.envMapIntensity = 1.0;
+    if (src.envMapIntensity === undefined) src.envMapIntensity = ENV_INTENSITY;
     return applyMaterialOverride(src, override);
   }
 
@@ -3225,7 +3241,7 @@ function toPBRMaterial(src, options) {
     ? 0.30 * metallic
     : Math.min(0.35 + 0.60 * metallic, 0.95);
 
-  out.envMapIntensity = 1.0;
+  out.envMapIntensity = ENV_INTENSITY;
 
   out.transparent = src.transparent === true;
   out.opacity = typeof src.opacity === 'number' ? src.opacity : 1;
@@ -3240,7 +3256,7 @@ function toPBRMaterial(src, options) {
     out.roughness = Math.min(out.roughness, 0.06);
     out.ior = 2.0;
     out.specularIntensity = Math.max(out.specularIntensity, 1.4);
-    out.envMapIntensity = 1.4;
+    out.envMapIntensity = ENV_INTENSITY * 1.4;
   }
 
   // Lots of exported OBJs have inconsistent face winding, which makes half
