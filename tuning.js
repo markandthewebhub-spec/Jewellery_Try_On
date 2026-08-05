@@ -1,6 +1,8 @@
 // Live tuning panel — enabled with ?tune=1 in the URL.
 
-import { clearSavedTuning } from './engine3d.js';
+// Must match the specifier app.js uses, or this loads a SECOND engine module
+// with its own separate MODEL_TUNING — see the import map in index.html.
+import { clearSavedTuning } from 'vto/engine3d.js';
 
 // Keep an angle inside the sliders' -180..180 range.
 const wrapDeg = (deg) => (((deg + 180) % 360) + 360) % 360 - 180;

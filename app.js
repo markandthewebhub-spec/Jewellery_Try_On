@@ -1,10 +1,11 @@
-import { MediaPipeTracker, getTrackingLabel } from './mediapipe.js';
+// "vto/" specifiers, not relative paths — see the import map in index.html.
+import { MediaPipeTracker, getTrackingLabel } from 'vto/mediapipe.js';
 import {
   Engine3D,
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   discoverItems,
-} from './engine3d.js';
+} from 'vto/engine3d.js';
 
 const NOTIFICATION_DURATION = 4000;
 
@@ -559,7 +560,7 @@ async function init() {
   setJewelleryEnabled(false);
 
   if (new URLSearchParams(location.search).has('tune')) {
-    const { createTuner } = await import('./tuning.js');
+    const { createTuner } = await import('vto/tuning.js');
     window.__vtoTuner = createTuner(engine, () => [...activeByCategory.values()]);
   }
 }

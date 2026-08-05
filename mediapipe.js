@@ -1,5 +1,11 @@
-// Landmark smoothing factor.
-const SMOOTH_LANDMARK = 0.65;
+// Landmark smoothing, adaptive: heavy while a point is still, light while it
+// moves. A single fixed rate has to choose between jitter and lag; letting each
+// point pick its own by how fast it is actually travelling avoids the trade.
+const SMOOTH_LANDMARK_MIN = 0.42;
+const SMOOTH_LANDMARK_MAX = 0.94;
+
+// Movement per frame, in normalised units, that counts as "moving fast".
+const SMOOTH_LANDMARK_SPEED = 0.012;
 
 // Longest edge of the frame handed to MediaPipe, in pixels.
 const TRACK_MAX_DIM = 480;
@@ -15,6 +21,11 @@ const STALL_RESET_MS = 8000;
 
 // How many consecutive misses before we declare tracking lost and let the jewellery…
 const MISS_GRACE = 10;
+
+// The same, for ONE slot losing its hand while the detector still sees others.
+// One frame, i.e. no hold at all: the detector was asked for two hands and
+// returned fewer, so there is nothing left to hold on to. See _slot.
+const SLOT_DROP_GRACE = 1;
 
 // How many frames of agreement before a hand's handedness is considered settled.
 const HANDEDNESS_VOTES = 12;
@@ -240,11 +251,21 @@ export class MediaPipeTracker {
     }
     const out = new Array(next.length);
     for (let i = 0; i < next.length; i++) {
+      const p = prev[i];
+      const n = next[i];
+      const dx = n.x - p.x;
+      const dy = n.y - p.y;
+      const dz = (n.z || 0) - (p.z || 0);
+
+      const speed = Math.hypot(dx, dy);
+      const t = speed >= SMOOTH_LANDMARK_SPEED ? 1 : speed / SMOOTH_LANDMARK_SPEED;
+      const k = SMOOTH_LANDMARK_MIN + (SMOOTH_LANDMARK_MAX - SMOOTH_LANDMARK_MIN) * t;
+
       out[i] = {
-        x: prev[i].x + (next[i].x - prev[i].x) * SMOOTH_LANDMARK,
-        y: prev[i].y + (next[i].y - prev[i].y) * SMOOTH_LANDMARK,
-        z: (prev[i].z || 0) + ((next[i].z || 0) - (prev[i].z || 0)) * SMOOTH_LANDMARK,
-        visibility: next[i].visibility,
+        x: p.x + dx * k,
+        y: p.y + dy * k,
+        z: (p.z || 0) + dz * k,
+        visibility: n.visibility,
       };
     }
     return out;
@@ -332,22 +353,25 @@ export class MediaPipeTracker {
 
     const taken = new Set();
 
-    // 1. Continuity — each live slot keeps the nearest plausible detection.
+    // 1. Continuity — pair slots to detections BEST MATCH FIRST, across every
+    //    pair at once. Walking the slots in a fixed order instead lets whichever
+    //    is checked first claim a hand that plainly belongs to the other, and
+    //    the loser then falls back on a held copy of the hand it just lost.
+    const pairs = [];
     for (const key of ['left', 'right']) {
       const last = this._slotAnchor[key];
       if (!last.live) continue;
-
-      let best = -1;
-      let bestDist = Infinity;
       for (let i = 0; i < detections.length; i++) {
-        if (taken.has(i)) continue;
         const d = Math.hypot(detections[i].x - last.x, detections[i].y - last.y);
-        if (d < bestDist) { bestDist = d; best = i; }
+        if (d <= SLOT_MATCH_RADIUS) pairs.push({ key, i, d });
       }
-      if (best >= 0 && bestDist <= SLOT_MATCH_RADIUS) {
-        out[key] = detections[best];
-        taken.add(best);
-      }
+    }
+    pairs.sort((a, b) => a.d - b.d);
+
+    for (const pair of pairs) {
+      if (out[pair.key] || taken.has(pair.i)) continue;
+      out[pair.key] = detections[pair.i];
+      taken.add(pair.i);
     }
 
     // 2. Anything left over is a newly appeared hand and goes to a free slot.
@@ -400,12 +424,20 @@ export class MediaPipeTracker {
     return majority;
   }
 
+  // Only ever reached when the detector DID return hands. So a slot with no
+  // detection here has genuinely lost its hand, rather than the whole frame
+  // having failed — and it gets a much shorter reprieve. Holding a copy of a
+  // departed hand for the full grace period leaves it sitting on top of the
+  // hand that is still there, which is what put two bangles on one wrist.
   _slot(key, prop, landmarks) {
     if (landmarks) {
       this._miss[key] = 0;
       return this._smooth(this[prop], landmarks);
     }
-    if (++this._miss[key] >= MISS_GRACE) return null;
+    if (++this._miss[key] >= SLOT_DROP_GRACE) {
+      this._slotAnchor[key].live = false;
+      return null;
+    }
     return this[prop];
   }
 
