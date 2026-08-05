@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0B0B0B">
+  <meta name="description" content="Try on necklaces, earrings, rings and bracelets virtually using your camera — AI-powered real-time jewellery try-on.">
+  <title>Jewellery Try On</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💎</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+
+    <header class="header">
+      <h1 class="header-title">Jewellery Try On</h1>
+      <p class="header-subtitle">See it on yourself, in real time</p>
+      <div class="header-status">
+        <span id="tracking-status" class="status-dot offline" aria-hidden="true"></span>
+        <span id="tracking-label">Camera off</span>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <section class="camera-section" aria-label="Camera preview">
+        <div class="viewport-wrapper">
+          <video id="video" playsinline autoplay muted aria-label="Live camera feed"></video>
+          <canvas id="canvas3d" aria-hidden="true"></canvas>
+          <div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p id="loading-text">Loading model&hellip;</p>
+          </div>
+          <div id="camera-placeholder" class="camera-placeholder">
+            <div class="placeholder-icon" aria-hidden="true">
+              <svg viewBox="0 0 64 64" width="52" height="52" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 24L32 6L50 24L32 58L14 24Z" stroke="url(#gemGradient)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                <path d="M14 24H50" stroke="url(#gemGradient)" stroke-width="1.4"/>
+                <path d="M23 24L32 6L41 24" stroke="url(#gemGradient)" stroke-width="1.4"/>
+                <path d="M23 24L32 58L41 24" stroke="url(#gemGradient)" stroke-width="1.4"/>
+                <defs>
+                  <linearGradient id="gemGradient" x1="14" y1="6" x2="50" y2="58" gradientUnits="userSpaceOnUse">
+                    <stop stop-color="#F0D878"/>
+                    <stop offset="1" stop-color="#9A7B2C"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <p>Tap <strong>Start Camera</strong> to begin</p>
+          </div>
+        </div>
+
+        <div class="camera-controls" aria-label="Camera controls">
+          <button id="btn-start" class="btn btn-action" type="button">Start Camera</button>
+          <button id="btn-stop" class="btn btn-action" type="button" disabled>Stop Camera</button>
+          <button id="btn-screenshot" class="btn btn-action" type="button" disabled>Capture Screenshot</button>
+        </div>
+      </section>
+
+      <section class="jewellery-section" aria-label="Jewellery selection">
+        <div id="jewellery-controls" class="jewellery-controls"></div>
+      </section>
+
+    </main>
+
+    <footer class="footer">
+      <p>&copy; 2026 Jewellery Try On</p>
+    </footer>
+
+    <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+  </div>
+
+  <!-- Mobile console, only when asked for: add ?debug=1 to the URL -->
+  <script>
+    if (new URLSearchParams(location.search).has('debug')) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      s.onload = () => window.eruda && window.eruda.init();
+      document.head.appendChild(s);
+    }
+  </script>
+
+  <!--
+    Versions are pinned, and MUST stay in step with MP_VERSION in mediapipe.js.
+    Each solution's loader script and the WASM it fetches via locateFile are
+    released as a matched pair; when the two come from different builds the
+    failure is silent — tracking simply never produces a result. Unversioned
+    URLs let that drift happen on its own the next time a package is published.
+    If one of these ever 404s, drop the @version suffix in BOTH files.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
