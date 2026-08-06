@@ -158,7 +158,7 @@ body {
   height: 100%;
   pointer-events: none;
   z-index: 2;
-  /* NOTE: do NOT mirror this canvas. */
+  /* NOTE: */
 }
 
 .camera-placeholder {
@@ -337,7 +337,7 @@ body {
   opacity: 0.32;
   border-style: solid;
   filter: saturate(0.4);
-  /* Stays clickable on purpose — the handler explains why it is locked. */
+  /* Stays clickable on purpose — the handler explains why it is locked */
   cursor: pointer;
 }
 
@@ -345,7 +345,7 @@ body {
   opacity: 0.45;
 }
 
-/* Briefly draws attention to Start Camera when a locked piece is tapped. */
+/* Briefly draws attention to Start Camera when a locked piece is tapped */
 .btn-action.nudge {
   animation: nudge 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }

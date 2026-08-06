@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#0B0B0B">
-  <!-- This page cannot version itself, and it is the one that carries the version. -->
+  <!-- This page cannot version itself, and it is the one that carries the version -->
   <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <meta name="description" content="Try on necklaces, earrings, rings and bracelets virtually using your camera — AI-powered real-time jewellery try-on.">
   <title>Jewellery Try On</title>
@@ -77,7 +77,7 @@
 
   </div>
 
-  <!-- Mobile console, only when asked for: add ?debug=1 to the URL -->
+  <!-- Mobile console, only when asked for: -->
   <script>
     if (new URLSearchParams(location.search).has('debug')) {
       const s = document.createElement('script');
@@ -87,29 +87,12 @@
     }
   </script>
 
-  <!--
-    Versions are pinned, and MUST stay in step with MP_VERSION in mediapipe.js.
-    Each solution's loader script and the WASM it fetches via locateFile are
-    released as a matched pair; when the two come from different builds the
-    failure is silent — tracking simply never produces a result. Unversioned
-    URLs let that drift happen on its own the next time a package is published.
-    If one of these ever 404s, drop the @version suffix in BOTH files.
-  -->
+  <!-- Versions are pinned, and MUST stay in step with MP_VERSION in mediapipe.js -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1633559619/face_mesh.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
 
-  <!--
-    The app's own modules are loaded through a versioned import map.
-    Static hosting sends no Cache-Control, so browsers fall back to HEURISTIC
-    caching — roughly a tenth of the file's age — and a phone will then keep
-    running a stale engine for hours while the page looks reloaded. There is no
-    build step here, so the version is taken from the files themselves: one HEAD
-    request each, hashed into a token that changes only when a file changes.
-    Every module must be reached through a "vto/" specifier. A relative import
-    would resolve to the unversioned URL, and the stale copy it loaded would be
-    a SECOND instance of that module, with its own separate state.
-  -->
+  <!-- The app's own modules are loaded through a versioned import map -->
   <script>
     (async () => {
       const MODULES = ['app.js', 'engine3d.js', 'mediapipe.js', 'tuning.js'];

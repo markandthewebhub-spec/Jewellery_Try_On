@@ -5,8 +5,7 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 
 // MediaPipe FaceMesh / Pose / Hands landmark indices
 
-// FaceMesh's 468 points cover the face SURFACE only — the mesh boundary stops at the…
-// NAMING: every left/right below is ANATOMICAL — the subject's own body.
+// FaceMesh's 468 points cover the face SURFACE only — the mesh boundary stops at the… NAMING:
 const FACE = {
   chin: 152,
   forehead: 10,
@@ -19,7 +18,7 @@ const FACE = {
   rightJawAngle: 132,
   leftJawAngle: 361,
 
-  // Face-oval widest points, used for head width rather than for the ear.
+  // Face-oval widest points, used for head width rather than for the ear
   rightJaw: 234,
   leftJaw: 454,
 
@@ -34,7 +33,7 @@ const FACE = {
   leftTemple: 356,
 };
 
-// MediaPipe Pose. Named anatomically, like FACE above:
+// MediaPipe Pose
 const POSE = {
   leftShoulder: 11,
   rightShoulder: 12,
@@ -46,7 +45,7 @@ const POSE = {
   rightHip: 24,
 };
 
-// The two arms, as [elbow, wrist] — a bangle rides the forearm between them.
+// The two arms, as [elbow, wrist] — a bangle rides the forearm between them
 const FOREARM_PAIRS = [
   [POSE.leftElbow, POSE.leftWrist],
   [POSE.rightElbow, POSE.rightWrist],
@@ -64,10 +63,10 @@ const HAND = {
   pinkyMcp: 17,
 };
 
-// The four knuckles, index to pinky — the fan the palm's own frame is fitted to.
+// The four knuckles, index to pinky — the fan the palm's own frame is fitted to
 const MCP_ROW = [5, 9, 13, 17];
 
-// Finger chains, as [knuckle, middle joint, tip].
+// Finger chains, as [knuckle, middle joint, tip]
 const FINGER_CHAINS = [
   [5, 6, 8],     // index
   [9, 10, 12],   // middle
@@ -80,71 +79,43 @@ const FINGER_CHAINS = [
 const PLACE = {
   // Necklace
   // ►► THE ONE VALUE THAT MOVES THE NECKLACE UP OR DOWN ◄◄
-  // How far below the NECK PIVOT the chain crosses the sides of the neck, as a
-  // fraction of face height. The pivot sits 0.55 above the chin, so this lands
-  // the chain about (neckDrop - 0.55) of a face height below the chin.
-  // Bigger = lower. Everything else hangs off this.
+  // How far below the NECK PIVOT the chain crosses the sides of the neck
   neckDrop: 0.50,
 
-  // Where the head actually pivots when it nods: the atlanto-occipital joint,
-  // roughly level with the ear canals and well back toward the spine. Measured
-  // from the forehead-chin midpoint, so DROP is negative — the joint is ABOVE
-  // that midpoint, not below it.
-  // Getting this wrong is not a small error. Put the pivot a third of a face
-  // height too low and a 30° nod swings it a quarter of a face height forward,
-  // carrying the necklace off the neck and out into the air in front of the
-  // chest. That was the drift and the stretching.
+  // Where the head actually pivots when it nods:
   neckPivotDrop: -0.05,
   neckPivotBack: 0.30,
 
-  // Safety floor only, NOT the resting height — neckDrop above sets that.
-  // How far the highest FRONT-FACING part of the piece must stay below the chin.
-  // Measured against the front alone: the clasp and rear chain sit higher still,
-  // but they are behind the neck and can never reach a beard.
+  // Safety floor only, NOT the resting height — neckDrop above sets that
   neckClearChin: 0.30,
 
   // Absolute floor and ceiling on the anchor's distance below the chin, applied after…
   neckDropMin: 0.20,
   neckDropMax: 1.25,
-  // Height of the chain above the shoulder midpoint, as a fraction of shoulder
-  // span. MediaPipe's shoulder points sit at the joints, roughly 0.9 of a face
-  // height below the chin, and the chain rides about half a shoulder span above
-  // that.
+  // Height of the chain above the shoulder midpoint, as a fraction of shoulder span
   neckAboveShoulder: 0.38,
-  // Furthest the torso may move the anchor up or down, in face heights.
+  // Furthest the torso may move the anchor up or down, in face heights
   neckShoulderLift: 0.12,
-  // Furthest it may move it toward or away from the lens, in neck radii.
+  // Furthest it may move it toward or away from the lens, in neck radii
   neckShoulderDepth: 0.35,
-  // How much of the neck's ORIENTATION the torso is allowed to contribute.
+  // How much of the neck's ORIENTATION the torso is allowed to contribute
   neckTorsoAxis: 0.25,
   neckRadius: 0.66,
-  // Chain diameter relative to the neck's.
+  // Chain diameter relative to the neck's
   necklaceWidth: 1.02,
   // Runaway guard on how far the piece may hang below the neck, as a fraction of face…
   pendantDrop: 1.10,
-  // Must stay 0 while the neck mask is concentric with the chain — see updateNecklace.
+  // Must stay 0 while the neck mask is concentric with the chain — see updateNecklace
   necklaceForward: 0,
 
-  // Neck mask geometry, in CHAIN RADII rather than face heights — the mask has
-  // to stay rigid against the chain, and the chain's own radius is the only
-  // measure that does not wobble with the tracking. It must cover the neck,
-  // where the rear chain passes, and stop short of the pendant hanging in front
-  // of the chest, which must never be cut.
+  // Neck mask geometry, in CHAIN RADII rather than face heights
   neckMaskLength: 1.90,
   neckMaskLift: 0.41,
 
-  // Neck mask size, as a multiple of the chain's OWN wrap radius.
-  // A wrapped chain lies on a cylinder, so the mask must be that same cylinder:
-  // then every point past 90° is behind it and turns away out of sight, exactly
-  // as a real chain does. Undersize it and the far side never hides at all.
-  // Elliptical, because a real neck is wider than it is deep. The extra width
-  // swallows the last of the rear chain at the sides, where the chain's own
-  // thickness would otherwise poke past the silhouette, while the shallower
-  // depth leaves the front of the chain standing clear.
+  // Neck mask size, as a multiple of the chain's OWN wrap radius
   neckMaskWide: 1.02,
   neckMaskDeep: 0.97,
-  // A model that was already 3D was never wrapped, so its chain radius is only
-  // an estimate — keep the old conservative mask for those.
+  // A model that was already 3D was never wrapped
   neckMaskFitFlat: 0.86,
 
   // Torso contribution
@@ -164,71 +135,61 @@ const PLACE = {
   earringRollFollow: 0.55,
   earringHeadFollow: 0.82,
   earringOutward: 0.38,
-  // Which earrings are visible.
+  // Which earrings are visible
   earringFadeStart: -0.10,
   earringFadeEnd: -0.35,
 
   // Ring
-  // Outer diameter in finger widths — the FALLBACK, used only when the model has
-  // no measurable hole. Anything with a hole is fitted by it instead.
+  // Outer diameter in finger widths — the FALLBACK, used only when the model has no measurable hole
   ringWidth: 1.30,
-  // How much of the model's hole the finger fills, 1 = exactly.
+  // How much of the model's hole the finger fills, 1 = exactly
   ringHoleFit: 1.0,
-  // Finger shaft width as a fraction of the knuckle spacing.
+  // Finger shaft width as a fraction of the knuckle spacing
   ringShaft: 0.82,
-  // Seat along the proximal phalanx, 0 = knuckle, 1 = first joint.
+  // Seat along the proximal phalanx, 0 = knuckle, 1 = first joint
   ringSeat: 0.52,
   ringDepth: 0.18,
   ringMinPx: 18,
-  // Shortest the proximal phalanx may measure, relative to the gap between neighbouring…
-  // Ring-finger validation — see ringFingerQuality.
+  // Shortest the proximal phalanx may measure
   ringMinPhalanx: 0.55,
   ringPhalanxBand: 0.18,
   ringMinStraight: 0.86,
   ringStraightBand: 0.07,
   ringMinProportion: 1.05,
-  // How square-on the phalanx must lie before its direction is trusted.
+  // How square-on the phalanx must lie before its direction is trusted
   ringMinAxisView: 0.20,
   ringAxisBand: 0.15,
 
   // Which face of the finger carries the ornament
   ringStoneOnBackOfHand: false,
 
-  // Hand occlusion. A piece is hidden when a hand covers it — see _handCoverage.
+  // Hand occlusion
   handCoverReach: 0.95,
   handCoverFade: 0.35,
 
-  // Bangles
-  // Outer diameter in wrist widths — the FALLBACK, as for the ring above.
+  // Bangles: outer diameter in wrist widths — the FALLBACK, as for the ring above
   braceletWidth: 1.32,
-  // A bangle is loose: its hole clears the wrist by this much.
+  // A bangle is loose:
   bangleHoleFit: 1.08,
-  // How much of that slack gravity takes up, pulling it onto the underside.
+  // How much of that slack gravity takes up, pulling it onto the underside
   bangleSag: 0.75,
-  // How far up the forearm it sits, in wrist widths.
+  // How far up the forearm it sits, in wrist widths
   braceletSlide: 0.44,
   braceletDepth: 0.15,
   braceletMinPx: 20,
-  // Wrist width as a fraction of the KNUCKLE-CENTRE span (landmarks 5 to 17),
-  // and wrist depth as a fraction of that width. Both straight from anthropometry:
-  // wrist breadth is 0.88 of that span on adult hands of either sex, and the
-  // wrist is about 0.7 as deep as it is wide. This sizes the arm occluder, and
-  // an arm too thin to fill the bangle is what left it reading as a flat ring
-  // laid on top rather than a hoop the arm passes through.
+  // Wrist width as a fraction of the KNUCKLE-CENTRE span (landmarks 5 to 17)
   wristFromPalm: 0.86,
   wristDepthRatio: 0.70,
-  // How far the forearm mask runs each way from the bangle, in knuckle spans.
-  // Lopsided on purpose: the arm is behind the bangle, and a mask reaching
-  // forward as far would cover the knuckles and swallow a ring worn with it.
+  // How far the forearm mask runs each way from the bangle, in knuckle spans
   forearmMaskToHand: 0.70,
   forearmMaskToElbow: 2.30,
-  // How far the bangle is allowed to leave the hand for Pose's forearm.
+  // How far the bangle is allowed to leave the hand for Pose's forearm
   forearmTrust: 0.85,
 };
 
 // SMOOTHING
 
-// Per-category profiles.
+// Per-category profiles
 const SMOOTH_PROFILE = {
   necklace: { posMin: 0.14, posMax: 0.72, rotMin: 0.10, rotMax: 0.55, scale: 0.14, depth: 0.14 },
   earring: { posMin: 0.20, posMax: 0.86, rotMin: 0.14, rotMax: 0.68, scale: 0.18, depth: 0.18 },
@@ -241,17 +202,17 @@ const SMOOTH_PROFILE = {
 const RESPONSE_SPEED = 0.055;
 const RESPONSE_ANGLE = 0.020;   // radians per frame, same idea for rotation
 
-// Deadband: ignore sub-pixel position changes and sub-0.5% scale changes entirely.
+// Deadband:
 const DEADBAND_PX = 0.35;
 const DEADBAND_SCALE = 0.005;
 
-// Jump rejection. A landmark glitch (or a genuine re-detection after occlusion) can…
+// Jump rejection
 const JUMP_SNAP = 2.5;
 
 // How far past the edge of the canvas an anchor may sit before the piece is treated as…
 const OFFSCREEN_MARGIN = 1.5;
 
-// Hide jewellery that a hand is covering.
+// Hide jewellery that a hand is covering
 const HIDE_UNDER_HANDS = true;
 
 // BODY-PART VISIBILITY
@@ -260,7 +221,7 @@ const HIDE_UNDER_HANDS = true;
 const HAND_HOLD_MISSES = 2;
 const HAND_FADE_MISSES = 5;
 
-// How much a piece should still be trusted, given how stale its landmarks are.
+// How much a piece should still be trusted, given how stale its landmarks are
 function freshness(miss, hold = HAND_HOLD_MISSES, fade = HAND_FADE_MISSES) {
   if (!Number.isFinite(miss) || miss <= hold) return 1;
   return clamp01(1 - (miss - hold) / fade);
@@ -284,26 +245,25 @@ function allInFrame(landmarks, indices, margin) {
 // The four landmarks that make up the ring finger:
 const RING_FINGER_CHAIN = [13, 14, 15, 16];
 
-// The knuckles the ring's size and orientation are measured from.
+// The knuckles the ring's size and orientation are measured from
 const RING_SUPPORT = [0, 5, 9, 13, 17];
 
-// The ring finger must be fully inside the picture, with no margin at all.
+// The ring finger must be fully inside the picture, with no margin at all
 const RING_FRAME_MARGIN = 0;
 
-// How much better the other hand's ring finger must look before the ring moves to it.
+// How much better the other hand's ring finger must look before the ring moves to it
 const RING_HAND_STICK = 1.3;
 
-// Proximal phalanx length as a multiple of finger width, on a real hand.
+// Proximal phalanx length as a multiple of finger width, on a real hand
 const RING_BONE_TO_WIDTH = 1.85;
 
-// Finger and wrist thickness change only as the limb nears the lens, so they are
-// filtered hard — this is the one channel where lag costs nothing.
+// Finger and wrist thickness change only as the limb nears the lens
 const LIMB_WIDTH_SMOOTH = 0.12;
 
-// How coherent the palm's triangles must be before their average normal is trusted.
+// How coherent the palm's triangles must be before their average normal is trusted
 const MIN_PALM_AGREEMENT = 0.25;
 
-// How close Pose's wrist must land to the hand's own, in normalised units.
+// How close Pose's wrist must land to the hand's own, in normalised units
 const FOREARM_MATCH_RADIUS = 0.14;
 const FOREARM_MIN_VISIBILITY = 0.5;
 
@@ -325,40 +285,38 @@ function ringFingerQuality(hand, engine) {
   const path = proximal + middle + distal;
   if (!(path > 1e-4)) return 0;
 
-  // LENGTH — fades in across the band rather than switching at its edge.
+  // LENGTH — fades in across the band rather than switching at its edge
   const lengthScore = clamp01(
     (proximal / knuckleGap - PLACE.ringMinPhalanx) / PLACE.ringPhalanxBand,
   );
 
-  // STRAIGHTNESS — 1 is fully extended, and it falls away as the finger curls.
+  // STRAIGHTNESS — 1 is fully extended, and it falls away as the finger curls
   const chord = engine.dist3D(mcp, tip);
   const straightScore = clamp01(
     (chord / path - PLACE.ringMinStraight) / PLACE.ringStraightBand,
   );
 
-  // PROPORTION — the proximal bone outreaches the middle one on every real hand.
+  // PROPORTION — the proximal bone outreaches the middle one on every real hand
   if (proximal < middle * PLACE.ringMinProportion) return 0;
 
   return Math.min(lengthScore, straightScore);
 }
 
-// Wrist plus the two knuckles the bracelet's width and orientation are measured from.
+// Wrist plus the two knuckles the bracelet's width and orientation are measured from
 const WRIST_CHAIN = [0, 5, 17];
 
-// The points compared when deciding whether two hand slots hold one hand.
+// The points compared when deciding whether two hand slots hold one hand
 const SAME_HAND_POINTS = [0, 5, 9, 13, 17];
 
-// How closely they must shadow each other to count as one hand, as a fraction
-// of the knuckle span. Half a knuckle span averaged over the whole row is far
-// tighter than two real hands can ever be, even held side by side.
+// How closely they must shadow each other to count as one hand, as a fraction of the knuckle span
 const SAME_HAND_LIMIT = 0.5;
 
-// Rate the invisible body masks follow their target at.
+// Rate the invisible body masks follow their target at
 const MASK_SMOOTH = 0.55;
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-// Rescales a per-60fps lerp factor to the frame time actually observed.
+// Rescales a per-60fps lerp factor to the frame time actually observed
 function adapt(k, dtScale) {
   if (k <= 0) return 0;
   if (k >= 1) return 1;
@@ -411,11 +369,11 @@ export function clearSavedTuning() {
 
 loadSavedTuning();
 
-// `pair: 2` means one uploaded model is duplicated into a left/right pair.
+// `pair:
 const CATEGORY_DEFAULTS = {
-  // The necklace is anchored at the NECK CENTRE, not hung from a top edge.
+  // The necklace is anchored at the NECK CENTRE, not hung from a top edge
   necklace: { fitAxis: 'x', anchor: 'center', scale: 1, pair: 1, pairMirror: false },
-  // Earrings hang from the hook, which is the pivot the model gets.
+  // Earrings hang from the hook, which is the pivot the model gets
   earring: { fitAxis: 'y', anchor: 'top', scale: 1, pair: 2, pairMirror: false },
   ring: { fitAxis: 'x', anchor: 'center', scale: 1, pair: 1, pairMirror: false },
   bracelet: { fitAxis: 'x', anchor: 'center', scale: 1, pair: 2, pairMirror: false },
@@ -424,7 +382,7 @@ const CATEGORY_DEFAULTS = {
 const FADE_SPEED = 0.18;
 const DEG = Math.PI / 180;
 
-// Scratch objects.
+// Scratch objects
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -442,11 +400,11 @@ const _bUp = new THREE.Vector3();
 const _bRight = new THREE.Vector3();
 const _bFwd = new THREE.Vector3();
 const _bm4 = new THREE.Matrix4();
-// Scratch for mask placement.
+// Scratch for mask placement
 const _mPos = new THREE.Vector3();
 const _mScale = new THREE.Vector3();
 
-// Scratch for the palm-frame solve.
+// Scratch for the palm-frame solve
 const _hfWrist = new THREE.Vector3();
 const _hfP = new THREE.Vector3();
 const _hfQ = new THREE.Vector3();
@@ -455,14 +413,14 @@ const _hfNormal = new THREE.Vector3();
 const _hfAcross = new THREE.Vector3();
 const _hfAlong = new THREE.Vector3();
 
-// Returned by _handFrame — the same object every call, never retained by a caller.
+// Returned by _handFrame — the same object every call, never retained by a caller
 const _handFrameOut = { normal: _hfNormal, across: _hfAcross, along: _hfAlong };
 
-// Scratch for the forearm solve.
+// Scratch for the forearm solve
 const _faElbow = new THREE.Vector3();
 const _faWrist = new THREE.Vector3();
 
-// Scratch for the hand-occlusion test.
+// Scratch for the hand-occlusion test
 const _hcWrist = new THREE.Vector3();
 const _hcIndex = new THREE.Vector3();
 const _hcPinky = new THREE.Vector3();
@@ -478,12 +436,11 @@ function basisQuat(primaryUp, refFwd, outQuat) {
   _bFwd.copy(refFwd);
   if (_bFwd.lengthSq() < 1e-12) _bFwd.set(0, 0, 1);
 
-  // Gram-Schmidt: strip the part of forward that lies along up.
+  // Gram-Schmidt:
   _bFwd.addScaledVector(_bUp, -_bUp.dot(_bFwd));
 
   if (_bFwd.lengthSq() < 1e-8) {
-    // forward was parallel to up — pick any perpendicular axis rather than
-    // emitting a non-unit quaternion (which silently shrinks the model).
+    // forward was parallel to up
     if (Math.abs(_bUp.z) < 0.9) _bFwd.set(0, 0, 1);
     else _bFwd.set(1, 0, 0);
     _bFwd.addScaledVector(_bUp, -_bUp.dot(_bFwd));
@@ -496,7 +453,7 @@ function basisQuat(primaryUp, refFwd, outQuat) {
   return outQuat.setFromRotationMatrix(_bm4);
 }
 
-// Per-channel smoothing state.
+// Per-channel smoothing state
 function newSmoothState() {
   return {
     position: new THREE.Vector3(),   // x/y — screen plane
@@ -504,7 +461,7 @@ function newSmoothState() {
     scale: 1,
     quaternion: new THREE.Quaternion(),
     initialized: false,
-    // Confidence ramp.
+    // Confidence ramp
     age: 0,
   };
 }
@@ -516,9 +473,9 @@ function newHeadPose() {
     valid: false,
     center: new THREE.Vector3(),     // centroid of the head, screen space
     chin: new THREE.Vector3(),
-    // Midpoint of the two jaw angles.
+    // Midpoint of the two jaw angles
     jawCenter: new THREE.Vector3(),
-    // Roughly the atlanto-occipital joint — the point a nod rotates the skull about.
+    // Roughly the atlanto-occipital joint — the point a nod rotates the skull about
     neckPivot: new THREE.Vector3(),
     right: new THREE.Vector3(),      // anatomical right, in screen space
     up: new THREE.Vector3(),
@@ -531,13 +488,13 @@ function newHeadPose() {
     // Last confident answer to "did the raw cross product point into the skull?" — held…
     faceSign: 1,
 
-    // How much this pose is still trusted, 1 down to 0.
+    // How much this pose is still trusted, 1 down to 0
     confidence: 0,
     staleFrames: 0,
   };
 }
 
-// How long a head pose survives with no fresh landmarks.
+// How long a head pose survives with no fresh landmarks
 const HEAD_HOLD_FRAMES = 14;
 const HEAD_FADE_FRAMES = 10;
 
@@ -556,7 +513,7 @@ function newTorsoPose() {
   };
 }
 
-// How quickly the torso solution fades in and out of use, per 60fps frame.
+// How quickly the torso solution fades in and out of use, per 60fps frame
 const TORSO_BLEND_RATE = 0.08;
 
 export class Engine3D {
@@ -573,8 +530,7 @@ export class Engine3D {
     this.offX = 0;
     this.offY = 0;
 
-    // The camera feed is shown mirrored (selfie view), so landmarks get
-    // flipped here. The canvas itself must NOT be CSS-mirrored as well.
+    // The camera feed is shown mirrored (selfie view), so landmarks get flipped here
     this.mirror = true;
 
     this.scene = new THREE.Scene();
@@ -592,11 +548,11 @@ export class Engine3D {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // No tone mapping, deliberately.
+    // No tone mapping, deliberately
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.toneMappingExposure = 1.0;
 
-    // Orthographic, looking down -Z.
+    // Orthographic, looking down -Z
     this.camera = new THREE.OrthographicCamera(-0.5, 0.5, 0.5, -0.5, 500, 3500);
     this.camera.position.z = 2000;
 
@@ -613,27 +569,27 @@ export class Engine3D {
     this.pendingLoads = new Map();
     this.activeItems = new Map();
 
-    // Rebuilt once per frame and shared by every face-driven piece.
+    // Rebuilt once per frame and shared by every face-driven piece
     this.headPose = newHeadPose();
-    // Shoulders and chest, when Pose is running and its answer passes checks.
+    // Shoulders and chest, when Pose is running and its answer passes checks
     this.torsoPose = newTorsoPose();
 
     // Frame timing, so every smoothing rate can be expressed per-60fps-frame and rescaled…
     this._lastFrameTime = 0;
     this._dtScale = 1;
 
-    // Smoothing state for the invisible body masks, keyed by mask.
+    // Smoothing state for the invisible body masks, keyed by mask
     this._maskStates = new Map();
 
     // Last landmark arrays actually solved, so an unchanged one can be skipped — see…
     this._lastFaceRef = null;
     this._lastPoseRef = null;
 
-    // Detector results the face has been missing for, refreshed each frame.
+    // Detector results the face has been missing for, refreshed each frame
     this._faceMiss = 0;
     this._tracking = null;
 
-    // Open the page with ?anchors=1 to draw a dot at every attachment point.
+    // Open the page with ?anchors=1 to draw a dot at every attachment point
     this.showAnchors = typeof location !== 'undefined'
       && new URLSearchParams(location.search).has('anchors');
     this._anchorMarks = new Map();
@@ -643,7 +599,7 @@ export class Engine3D {
     this._buildOccluders();
   }
 
-  // Pre-filters a small studio probe into an environment map.
+  // Pre-filters a small studio probe into an environment map
   _buildEnvironment() {
     try {
       const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -654,8 +610,7 @@ export class Engine3D {
       pmrem.dispose();
     } catch (err) {
       console.warn('[Engine3D] environment map unavailable — lighting only', err);
-      // Give the ambient back what the probe would have contributed, so a
-      // device without it is merely flatter rather than dark.
+      // Give the ambient back what the probe would have contributed
       this.ambient.intensity = 0.9;
     }
   }
@@ -667,16 +622,9 @@ export class Engine3D {
       colorWrite: false,
       depthWrite: true,
       depthTest: true,
-      // Push the mask a little AWAY from the camera in depth only.
+      // Push the mask a little AWAY from the camera in depth only
       polygonOffset: true,
-      // Constant only — the slope term MUST stay at zero. It scales with how
-      // steeply the surface recedes from the camera, and a cylinder seen
-      // end-on (which is exactly what the neck becomes when the head tilts
-      // down) recedes almost infinitely steeply. The mask was being pushed
-      // back far enough to let the entire chain draw through it.
-      // Every mask now clears its jewellery geometrically instead: the neck
-      // sits inside the chain's own thickness, the finger inside the ring's
-      // hole, the forearm inside the bangle's.
+      // Constant only — the slope term MUST stay at zero
       polygonOffsetFactor: 0,
       polygonOffsetUnits: 2,
     });
@@ -691,11 +639,7 @@ export class Engine3D {
       return m;
     };
 
-    // Unit primitives — all real sizing happens through per-frame scale, so
-    // the geometry is allocated exactly once.
-    // Cylinders are built along +Y (three.js default) to match the limb
-    // frames, which also use +Y as the bone axis.
-    // CLOSED cylinders (openEnded = false).
+    // Unit primitives — all real sizing happens through per-frame scale
     this.occluders = {
       neck: mask(new THREE.CylinderGeometry(1, 1, 1, 20, 1, false)),
       head: mask(new THREE.SphereGeometry(1, 20, 14)),
@@ -707,7 +651,7 @@ export class Engine3D {
     };
   }
 
-  // Every occluder off; re-enabled per frame only by whatever needs it.
+  // Every occluder off; re-enabled per frame only by whatever needs it
   _resetOccluders() {
     this.occluders.neck.visible = false;
     this.occluders.head.visible = false;
@@ -746,8 +690,7 @@ export class Engine3D {
       st.live = true;
     } else {
       const k = adapt(MASK_SMOOTH, this._dtScale);
-      // A mask that has teleported (re-detection after occlusion) must not
-      // sweep across the frame carving through everything on the way.
+      // A mask that has teleported (re-detection after occlusion) must not sweep across the frame
       if (st.position.distanceTo(position) > Math.max(scale.y, scale.x) * JUMP_SNAP) {
         st.position.copy(position);
         st.quaternion.copy(quaternion);
@@ -765,7 +708,7 @@ export class Engine3D {
     mesh.visible = true;
   }
 
-  // Masks forget their pose when their jewellery goes away.
+  // Masks forget their pose when their jewellery goes away
   _forgetMask(key) {
     const st = this._maskStates.get(key);
     if (st) st.live = false;
@@ -777,7 +720,7 @@ export class Engine3D {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
 
-    // Re-read the device pixel ratio on every resize.
+    // Re-read the device pixel ratio on every resize
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (this.renderer.getPixelRatio() !== dpr) this.renderer.setPixelRatio(dpr);
 
@@ -791,7 +734,7 @@ export class Engine3D {
     this.camera.bottom = -hh;
     this.camera.updateProjectionMatrix();
 
-    // A three-point rig.
+    // A three-point rig
     this.keyLight.position.set(hw * 0.45, hh * 0.75, 1200);
     this.fillLight.position.set(-hw * 0.6, -hh * 0.35, 900);
     this.rimLight.position.set(-hw * 0.25, hh * 0.6, -1000);
@@ -817,7 +760,7 @@ export class Engine3D {
     this.offY = (this.height - this.dispH) / 2;
   }
 
-  // Normalised landmark → centred screen-space point.
+  // Normalised landmark → centred screen-space point
   lmToScreen(lm, out) {
     const nx = this.mirror ? 1 - lm.x : lm.x;
     const px = this.offX + nx * this.dispW;
@@ -829,14 +772,14 @@ export class Engine3D {
     );
   }
 
-  // Distance between two landmarks in on-screen pixels (ignores depth).
+  // Distance between two landmarks in on-screen pixels (ignores depth)
   dist2D(a, b) {
     const dx = (a.x - b.x) * this.dispW;
     const dy = (a.y - b.y) * this.dispH;
     return Math.hypot(dx, dy);
   }
 
-  // True 3D distance in the same pixel units, including depth.
+  // True 3D distance in the same pixel units, including depth
   dist3D(a, b) {
     const dx = (a.x - b.x) * this.dispW;
     const dy = (a.y - b.y) * this.dispH;
@@ -846,8 +789,7 @@ export class Engine3D {
 
   // Head pose
 
-  // Builds the head's own 3D coordinate frame for this frame.
-  // Marks this frame as having no usable face, WITHOUT immediately throwing the pose away.
+  // Builds the head's own 3D coordinate frame for this frame
   _decayHeadPose() {
     const hp = this.headPose;
     if (!hp.confidence && !hp.valid) {
@@ -858,7 +800,7 @@ export class Engine3D {
     hp.staleFrames += 1;
 
     if (hp.staleFrames <= HEAD_HOLD_FRAMES) {
-      // Still holding: the pose keeps every value it had.
+      // Still holding:
       hp.confidence = 1;
       hp.valid = true;
       return hp;
@@ -877,7 +819,7 @@ export class Engine3D {
       return this._decayHeadPose();
     }
 
-    // Rendering runs at display rate; FaceMesh delivers results at a third of that or less.
+    // Rendering runs at display rate; FaceMesh delivers results at a third of that or less
     if (face === this._lastFaceRef && hp.valid) return hp;
     this._lastFaceRef = face;
 
@@ -898,13 +840,12 @@ export class Engine3D {
     this.lmToScreen(lEye, _v3);
     this.lmToScreen(rEye, _v4);
 
-    // Built in scratch, committed to `hp` only once every check has passed.
+    // Built in scratch, committed to `hp` only once every check has passed
     const right = _n1;
     const up = _n2;
     const forward = _n3;
 
     // Anatomical right:
-    // left eye and `_v4` the right, so the subtraction runs left → right.
     right.subVectors(_v4, _v3);
     up.subVectors(_v1, _v2);
 
@@ -913,7 +854,7 @@ export class Engine3D {
     right.normalize();
     up.normalize();
 
-    // forward = right × up.
+    // forward = right × up
     forward.crossVectors(right, up);
     if (forward.lengthSq() < 1e-9) return this._decayHeadPose();
     forward.normalize();
@@ -933,16 +874,15 @@ export class Engine3D {
       }
       hp.faceSign = flipped ? -1 : 1;
     } else if (hp.faceSign < 0) {
-      // Too close to call — reuse the last trustworthy decision.
+      // Too close to call — reuse the last trustworthy decision
       forward.negate();
       right.negate();
     }
 
     // Re-orthogonalise:
-    // exactly perpendicular on a real face.
     right.crossVectors(up, forward).normalize();
 
-    // Every check passed — commit.
+    // Every check passed — commit
     hp.right.copy(right);
     hp.up.copy(up);
     hp.forward.copy(forward);
@@ -953,14 +893,12 @@ export class Engine3D {
     hp.chin.copy(_v2);
     hp.center.copy(_v2).addScaledVector(hp.up, faceHeight * 0.5);
 
-    // Jaw angles (gonions).
-    // of the skull and is the steady anchor the necklace is hung from.
+    // Jaw angles (gonions)
     this.lmToScreen(face[FACE.rightJawAngle], _v7);
     this.lmToScreen(face[FACE.leftJawAngle], _v8);
     hp.jawCenter.addVectors(_v7, _v8).multiplyScalar(0.5);
 
-    // The neck pivot, in the head's own frame — down from the centroid and back
-    // toward the spine. Everything worn on the neck hangs from here.
+    // The neck pivot, in the head's own frame — down from the centroid and back toward the spine
     hp.neckPivot.copy(hp.center)
       .addScaledVector(hp.up, -faceHeight * PLACE.neckPivotDrop)
       .addScaledVector(hp.forward, -jawWidth * PLACE.neckPivotBack);
@@ -970,7 +908,6 @@ export class Engine3D {
     hp.halfWidth = jawWidth * 0.5;
 
     // Yaw straight off the frame:
-    // the camera axis.
     hp.yaw = Math.atan2(hp.forward.x, hp.forward.z);
 
     hp.staleFrames = 0;
@@ -981,7 +918,7 @@ export class Engine3D {
 
   // Torso pose
 
-  // Builds the shoulder/chest frame, or declines to.
+  // Builds the shoulder/chest frame, or declines to
   _updateTorsoPose(pose) {
     const tp = this.torsoPose;
     const hp = this.headPose;
@@ -995,7 +932,7 @@ export class Engine3D {
       ok = this._solveTorso(pose, tp, hp);
     }
 
-    // Ramped rather than switched.
+    // Ramped rather than switched
     const target = ok ? 1 : 0;
     tp.blend += (target - tp.blend) * adapt(TORSO_BLEND_RATE, this._dtScale);
     tp.blend = clamp01(tp.blend);
@@ -1010,15 +947,15 @@ export class Engine3D {
     const rs = pose[POSE.rightShoulder];
     if (!ls || !rs) return false;
 
-    // 1. Does Pose itself believe in these points?
+    // 1
     const vis = Math.min(ls.visibility ?? 0, rs.visibility ?? 0);
     if (vis < 0.55) return false;
 
-    // 2. Are they actually inside the picture? A little overshoot is normal and fine; a…
+    // 2
     const inFrame = (lm) => lm.x > -0.15 && lm.x < 1.15 && lm.y > -0.15 && lm.y < 1.12;
     if (!inFrame(ls) || !inFrame(rs)) return false;
 
-    // 3. Is the result anatomically plausible? Shoulder span is reliably between about one…
+    // 3
     const width = this.dist3D(ls, rs);
     if (!(width > 1e-3)) return false;
     const ratio = width / Math.max(hp.jawWidth, 1e-6);
@@ -1027,14 +964,14 @@ export class Engine3D {
     this.lmToScreen(ls, _v1);
     this.lmToScreen(rs, _v2);
 
-    // Anatomical right, from the left shoulder toward the right one.
+    // Anatomical right, from the left shoulder toward the right one
     tp.right.subVectors(_v2, _v1);
     if (tp.right.lengthSq() < 1e-9) return false;
     tp.right.normalize();
 
     tp.shoulderMid.addVectors(_v1, _v2).multiplyScalar(0.5);
 
-    // Torso up: from the hips toward the shoulders when the hips are visible, which is the…
+    // Torso up:
     const lh = pose[POSE.leftHip];
     const rh = pose[POSE.rightHip];
     const hipsVisible = lh && rh
@@ -1062,8 +999,7 @@ export class Engine3D {
       tp.right.negate();
     }
 
-    // Re-orthogonalise; the shoulder line and the spine are not exactly
-    // perpendicular on a real body.
+    // Re-orthogonalise; the shoulder line and the spine are not exactly perpendicular on a real body
     tp.right.crossVectors(tp.up, tp.forward).normalize();
 
     tp.width = width;
@@ -1095,14 +1031,11 @@ export class Engine3D {
   async _loadTemplate(folder, objFile, category, cacheKey, onProgress) {
     const basePath = `objects/${folder}/`;
 
-    // Fetch the OBJ once, with progress — these files can be tens of MB and
-    // a silent 30-second parse looks exactly like a crash.
+    // Fetch the OBJ once, with progress
     const raw = await fetchTextWithProgress(`${basePath}${objFile}`, onProgress);
     const objText = sanitizeObjText(raw, cacheKey);
 
-    // Every loader is a fresh instance.
-    // mutated setPath()/setMaterials() on it, so two concurrent loads
-    // corrupted each other's base path and material set.
+    // Every loader is a fresh instance
     const objLoader = new OBJLoader();
     const materials = await this._loadMaterials(basePath, objFile, objText);
     if (materials) objLoader.setMaterials(materials);
@@ -1119,10 +1052,10 @@ export class Engine3D {
     object.traverse((child) => {
       if (!child.isMesh) return;
 
-      // Frustum culling OFF, deliberately.
+      // Frustum culling OFF, deliberately
       child.frustumCulled = false;
 
-      // No shadow map is enabled, so these only cost bookkeeping.
+      // No shadow map is enabled, so these only cost bookkeeping
       child.castShadow = false;
       child.receiveShadow = false;
 
@@ -1142,9 +1075,7 @@ export class Engine3D {
     });
 
     const tuning = {
-      // Carried so the tuner can show only the controls that apply to this
-      // kind of piece. Not persisted — saveTuning writes MODEL_TUNING, and
-      // the category is derived from the folder, never stored.
+      // Carried so the tuner can show only the controls that apply to this kind of piece
       category,
       ...CATEGORY_DEFAULTS[category],
       ...(MODEL_TUNING[folder] || {}),
@@ -1198,8 +1129,7 @@ export class Engine3D {
   activate(id, template) {
     if (this.activeItems.has(id)) return;
 
-    // Earrings and bracelets are worn as a pair, so one uploaded model gets
-    // duplicated: instance 0 = left side, instance 1 = right side.
+    // Earrings and bracelets are worn as a pair, so one uploaded model gets duplicated:
     const count = template.tuning.pair === 2 ? 2 : 1;
     const instances = [];
 
@@ -1209,10 +1139,7 @@ export class Engine3D {
       const mesh = cloneWithOwnMaterials(template.object);
 
       pivot.position.copy(template.anchorOffset);
-      // The mesh is centred on the pivot's origin, so flipping the pivot
-      // mirrors the model about its own centre.
-      // winding order for negative-determinant matrices, so lighting and
-      // face culling stay correct.
+      // The mesh is centred on the pivot's origin
       if (i === 1 && template.tuning.pairMirror) pivot.scale.x = -1;
       pivot.add(mesh);
       group.add(pivot);
@@ -1232,8 +1159,7 @@ export class Engine3D {
         materials,
         opacity: -1, // force the first setOpacity through
         state: newSmoothState(),
-        // Which smoothing profile this piece follows — a necklace and a ring
-        // sit on body parts with completely different motion.
+        // Which smoothing profile this piece follows
         smooth: SMOOTH_PROFILE[template.category] || SMOOTH_PROFILE.default,
       });
       this._setOpacity(instances[i], 0);
@@ -1269,35 +1195,28 @@ export class Engine3D {
     const fullyIn = opacity >= 0.999;
     for (const m of inst.materials) {
       m.opacity = (m.userData._baseOpacity ?? 1) * opacity;
-      // Once fully faded in, drop back to opaque rendering so the metal
-      // doesn't stay see-through.
-      // (e.g. gemstones with `d 0.7`) keep their transparency.
+      // Once fully faded in, drop back to opaque rendering so the metal doesn't stay see-through
       m.transparent = !fullyIn || m.userData._baseTransparent === true;
-      // depthWrite stays ON at every opacity, including mid-fade.
+      // depthWrite stays ON at every opacity, including mid-fade
       m.depthWrite = true;
-      // depthTest must stay on at every opacity — it is what lets the body
-      // occluders hide the far side of a chain or a hoop.
-      // while fading would make the piece briefly draw through the neck.
+      // depthTest must stay on at every opacity
       m.depthTest = true;
     }
   }
 
-  // Snap everything out of view immediately (used when the camera stops).
+  // Snap everything out of view immediately (used when the camera stops)
   hideAll() {
-    // Masks too — they are invisible, but they still write depth, and a stale
-    // one left over the frozen last frame would punch a hole in anything
-    // drawn afterwards.
+    // Masks too — they are invisible
     this._resetOccluders();
     for (const st of this._maskStates.values()) st.live = false;
 
-    // Clear the hold as well as the validity flag.
+    // Clear the hold as well as the validity flag
     this.headPose.valid = false;
     this.headPose.confidence = 0;
     this.headPose.staleFrames = 0;
     this.torsoPose.valid = false;
     this.torsoPose.blend = 0;
-    // Force a fresh solve on the next frame rather than reusing a cached one
-    // from before the camera stopped.
+    // Force a fresh solve on the next frame rather than reusing a cached one from before the camera
     this._lastFaceRef = null;
     this._lastPoseRef = null;
 
@@ -1312,7 +1231,7 @@ export class Engine3D {
     }
   }
 
-  // Smooth-follow + fade for one instance, filtering each channel separately.
+  // Smooth-follow + fade for one instance, filtering each channel separately
   place(inst, targetPos, targetScale, targetQuat, visible, alpha = 1) {
     const s = inst.state;
     const p = inst.smooth || SMOOTH_PROFILE.default;
@@ -1327,7 +1246,7 @@ export class Engine3D {
         s.initialized = true;
         s.age = 0;
       } else {
-        // Ramp: 0.35 → 1.0 of the nominal rate over ~8 frames.
+        // Ramp:
         s.age = Math.min(s.age + 1, 8);
         const ramp = 0.35 + 0.65 * (s.age / 8);
 
@@ -1335,7 +1254,7 @@ export class Engine3D {
         const dy = targetPos.y - s.position.y;
         const moved = Math.hypot(dx, dy);
 
-        // Anchor teleported — snap rather than sweep across the screen.
+        // Anchor teleported — snap rather than sweep across the screen
         if (moved > Math.max(targetScale, 1) * JUMP_SNAP) {
           s.position.set(targetPos.x, targetPos.y, 0);
           s.depth = targetPos.z;
@@ -1352,18 +1271,15 @@ export class Engine3D {
             s.position.y += dy * k;
           }
 
-          // Depth is the noisiest channel MediaPipe produces — filter hardest,
-          // and at a fixed rate:
-          // making it responsive would just let the noise back in.
+          // Depth is the noisiest channel MediaPipe produces — filter hardest, and at a fixed rate:
           s.depth += (targetPos.z - s.depth) * adapt(p.depth, dtScale) * ramp;
 
           // Scale gets a RELATIVE deadband:
-          // threshold means the same thing near and far from the camera.
           if (Math.abs(targetScale - s.scale) > s.scale * DEADBAND_SCALE) {
             s.scale += (targetScale - s.scale) * adapt(p.scale, dtScale) * ramp;
           }
 
-          // Rotation gets the same treatment, keyed on the angle still to be covered.
+          // Rotation gets the same treatment, keyed on the angle still to be covered
           const swept = s.quaternion.angleTo(targetQuat);
           const kRot = responsive(
             p.rotMin, p.rotMax, swept, RESPONSE_ANGLE * dtScale, dtScale,
@@ -1380,8 +1296,7 @@ export class Engine3D {
     inst.group.visible = clamped > 0.02;
     this._setOpacity(inst, clamped);
 
-    // Fully hidden → forget the last pose so it snaps back in cleanly
-    // instead of sliding across the screen when tracking returns.
+    // Fully hidden → forget the last pose so it snaps back in cleanly instead of sliding across the
     if (!visible && clamped <= 0.02) {
       s.initialized = false;
       s.age = 0;
@@ -1400,7 +1315,7 @@ export class Engine3D {
     }
   }
 
-  // Draws a dot at an attachment point, when ?anchors=1 is on.
+  // Draws a dot at an attachment point, when ?anchors=1 is on
   _markAnchor(key, position, colour) {
     if (!this.showAnchors) return;
     let mark = this._anchorMarks.get(key);
@@ -1419,7 +1334,7 @@ export class Engine3D {
     mark.visible = true;
   }
 
-  // How much a tracked hand is covering this point, 0 to 1.
+  // How much a tracked hand is covering this point, 0 to 1
   _handCoverage(point, tracking, skip) {
     if (!tracking) return 0;
     let worst = 0;
@@ -1435,7 +1350,7 @@ export class Engine3D {
       const span = _hcIndex.distanceTo(_hcPinky);
       if (span < 1e-3) continue;
 
-      // Centre of the palm — the part of a hand that actually covers things.
+      // Centre of the palm — the part of a hand that actually covers things
       _hcPalm.copy(_hcWrist).add(_hcIndex).add(_hcPinky).add(_hcMiddle).multiplyScalar(0.25);
 
       const distance = Math.hypot(point.x - _hcPalm.x, point.y - _hcPalm.y);
@@ -1476,21 +1391,16 @@ export class Engine3D {
     // The neck frame
     const NECK_FOLLOW = 0.38;
 
-    // Neck axis.
+    // Neck axis
     _n1.set(0, 1, 0).lerp(hp.up, NECK_FOLLOW).normalize();
-    // Neck forward.
+    // Neck forward
     _n2.set(0, 0, 1).lerp(hp.forward, NECK_FOLLOW).normalize();
 
     if (torso > 0.001) {
       // Torso axes, leaned a little toward the head so a head turn still rotates the chain…
       _v5.copy(tp.up).lerp(hp.up, 0.20).normalize();
       _v6.copy(tp.forward).lerp(hp.forward, 0.30).normalize();
-      // A NUDGE, never a handover. Pose's depth is far coarser than FaceMesh's,
-      // and its forward axis comes out of a cross product of two of those coarse
-      // vectors. Letting it reach 1 handed the necklace's whole orientation to
-      // the worse of the two solves — and it did so several seconds in, the
-      // moment the Pose model finished downloading, which is why the piece was
-      // right on a fresh load and wrong ever after.
+      // A NUDGE, never a handover
       _n1.lerp(_v5, torso * PLACE.neckTorsoAxis).normalize();
       _n2.lerp(_v6, torso * PLACE.neckTorsoAxis).normalize();
     }
@@ -1504,11 +1414,7 @@ export class Engine3D {
       neckRadius += (fromShoulders - neckRadius) * torso * PLACE.neckShoulderTrust;
     }
 
-    // Anchor
-    // Hung from the NECK PIVOT, not from the chin. The chin sweeps a long arc
-    // every time the head nods and the neck does not, which is exactly why the
-    // chain used to climb onto the beard when the wearer looked down and lift
-    // clear of the throat when they looked up.
+    // Anchor: hung from the NECK PIVOT, not from the chin
     _pos.copy(hp.neckPivot)
       .addScaledVector(_n1, -faceHeight * PLACE.neckDrop)
       .addScaledVector(_n2, -neckRadius * PLACE.necklaceForward);
@@ -1517,27 +1423,20 @@ export class Engine3D {
     const faceAnchorY = _pos.y;
     const faceAnchorZ = _pos.z;
 
-    // Torso correction.
+    // Torso correction
     if (torso > 0.001) {
       _v5.copy(tp.shoulderMid).addScaledVector(tp.up, tp.width * PLACE.neckAboveShoulder);
       _pos.lerp(_v5, torso * PLACE.neckShoulderPull);
 
-      // Vertical deviation stays clamped, like the lateral one below. The
-      // shoulders say where the body is far better than they say how high the
-      // throat is, and an unclamped pull toward them drags the chain down onto
-      // the chest the moment Pose becomes confident.
+      // Vertical deviation stays clamped, like the lateral one below
       const lift = faceHeight * PLACE.neckShoulderLift;
       _pos.y = faceAnchorY + Math.min(Math.max(_pos.y - faceAnchorY, -lift), lift);
 
-      // Depth too. Pose measures z against the hips and it is the noisiest
-      // number in the whole pipeline; unclamped it slides the chain in and out
-      // of the neck mask, which is what makes the rear of the chain flicker.
+      // Depth too
       const push = neckRadius * PLACE.neckShoulderDepth;
       _pos.z = faceAnchorZ + Math.min(Math.max(_pos.z - faceAnchorZ, -push), push);
 
       // Lateral deviation stays clamped:
-      // extrapolates worst, so a bad shoulder may nudge the necklace but
-      // never carry it off the body.
       const limit = jawWidth * PLACE.neckShoulderShift;
       _pos.x = faceAnchorX + Math.min(Math.max(_pos.x - faceAnchorX, -limit), limit);
     }
@@ -1547,16 +1446,12 @@ export class Engine3D {
     let scale = (neckRadius * 2 * PLACE.necklaceWidth / openWidth)
       * (entry.tuning.scale ?? 1);
 
-    // Runaway guard only.
+    // Runaway guard only
     const drop = (analysis?.dropBelow || 0.5) * scale;
     const maxDrop = faceHeight * PLACE.pendantDrop;
     if (drop > maxDrop) scale *= maxDrop / drop;
 
-    // The guarantee
-    // Against the FRONT of the piece only. Using its full height instead counts
-    // the clasp and rear chain, which sit high behind the neck and cannot reach
-    // a chin — and that mistake alone was shoving the whole necklace a third of
-    // a face height down onto the chest.
+    // The guarantee: against the FRONT of the piece only
     const rise = Math.max(analysis?.frontRise ?? analysis?.riseAbove ?? 0, 0) * scale;
     const minDrop = Math.max(
       faceHeight * PLACE.neckClearChin + rise,
@@ -1572,51 +1467,40 @@ export class Engine3D {
     _pos.addScaledVector(_n1, -(wanted + along));
 
     const inst = entry.instances[0];
-    // The neck has left the picture — see _outOfFrame.
+    // The neck has left the picture — see _outOfFrame
     if (this._outOfFrame(_pos, scale)) return false;
 
     // Two independent signals, multiplied:
     this._markAnchor('neck', _pos, 0xffcc00);
 
-    // A hand raised over the throat hides the chain — see _handCoverage.
+    // A hand raised over the throat hides the chain — see _handCoverage
     const alpha = hp.confidence
       * freshness(tracking.faceMiss)
       * (1 - this._handCoverage(_pos, tracking, null));
     if (alpha <= 0.01) return false;
     this.place(inst, _pos, scale, _q1, true, alpha);
 
-    // Occluder
-    // The mask IS the neck, and a wrapped chain lies on the neck — so the two
-    // must be the same cylinder, sharing an axis and a radius. That single fact
-    // is what makes the chain turn away behind the neck instead of running on
-    // past it: every point past 90° is then genuinely behind the surface.
+    // Occluder: the mask IS the neck, and a wrapped chain lies on the neck
     const st = inst.state;
     const necklaceRadius = openWidth * 0.5 * scale;
 
-    // A model that was never wrapped has only an estimated chain radius, so it
-    // keeps the old conservative circular mask.
+    // A model that was never wrapped has only an estimated chain radius
     const wrapped = !!entry.analysis?.wrapped;
     const wide = wrapped ? PLACE.neckMaskWide : PLACE.neckMaskFitFlat;
     const deep = wrapped ? PLACE.neckMaskDeep : PLACE.neckMaskFitFlat;
 
-    // Every figure below is in the NECKLACE's own units and multiplied by its
-    // smoothed scale, so the mask is welded to the chain and cannot drift from
-    // it. Anything divided by the raw per-frame scale would breathe against the
-    // smoothed scale the chain is actually drawn at, and the mask's top edge
-    // would slide over the clasp — which is the hook flashing into view mid-turn.
-    // Local X is across the neck and local Z is its depth: the basis was built
-    // from the neck's own axis and forward, so the ellipse lands the right way round.
+    // Every figure below is in the NECKLACE's own units and multiplied by its smoothed scale
     const half = openWidth * 0.5;
     const wideRatio = half * wide;
     const deepRatio = half * deep;
     const lengthRatio = half * PLACE.neckMaskLength;
     const liftRatio = half * PLACE.neckMaskLift;
 
-    // The chain's own axis, taken from the SMOOTHED pose for the same reason.
+    // The chain's own axis, taken from the SMOOTHED pose for the same reason
     _v7.set(0, 1, 0).applyQuaternion(st.quaternion);
 
     _mPos.set(st.position.x, st.position.y, st.depth)
-      // Ride up toward the jaw, clear of anything hanging below.
+      // Ride up toward the jaw, clear of anything hanging below
       .addScaledVector(_v7, st.scale * liftRatio);
     _mScale.set(st.scale * wideRatio, st.scale * lengthRatio, st.scale * deepRatio);
     this._placeMask(this.occluders.neck, 'neck', _mPos, st.quaternion, _mScale, false);
@@ -1641,13 +1525,12 @@ export class Engine3D {
     if (widest * scale > maxSpan) scale = maxSpan / widest;
 
     // Each ear is solved completely on its own:
-    // orientation, its own filter state and its own visibility.
     this._placeEarring(entry, entry.instances[0], face, +1, scale);
     if (entry.instances[1]) {
       this._placeEarring(entry, entry.instances[1], face, -1, scale);
     }
 
-    // Head occluder: an ellipsoid standing in for the skull, so the far side of a hoop…
+    // Head occluder:
     _mPos.copy(hp.center).addScaledVector(hp.forward, -hp.halfWidth * 0.30);
     _mScale.set(hp.halfWidth * 0.72, faceHeight * 0.50, hp.halfWidth * 0.80);
     this._placeMask(this.occluders.head, 'head', _mPos, hp.quaternion, _mScale);
@@ -1673,15 +1556,15 @@ export class Engine3D {
     const earOut = tune.earOut ?? PLACE.earringLobeOut;
     const earBack = tune.earBack ?? PLACE.earringLobeBack;
 
-    // Anchor: the earlobe
+    // Anchor:
     if (face) {
       this.lmToScreen(face[earIdx], _v1);                 // lowest point beside the ear
       this.lmToScreen(face[jawIdx], _v2);                 // jaw angle, below and forward
 
-      // Start at the ear point and walk a short way toward the jaw angle.
+      // Start at the ear point and walk a short way toward the jaw angle
       _pos.copy(_v1).lerp(_v2, earDrop);
 
-      // Then out onto the lobe itself.
+      // Then out onto the lobe itself
       _pos
         .addScaledVector(_n1, hp.halfWidth * earOut)
         .addScaledVector(hp.forward, -hp.halfWidth * earBack);
@@ -1692,13 +1575,12 @@ export class Engine3D {
         .addScaledVector(hp.up, -faceHeight * 0.10);
     }
 
-    // There is deliberately NO head-frame prediction blend here any more.
+    // There is deliberately NO head-frame prediction blend here any more
 
     // Orientation
     _n3.set(0, 1, 0).lerp(hp.up, PLACE.earringRollFollow).normalize();
 
-    // Head forward, biased slightly toward the lens, then pushed outboard so
-    // the piece angles away from the cheek the way a real one hangs.
+    // Head forward, biased slightly toward the lens
     _v3.copy(hp.forward);
     _v3.z += (1 - PLACE.earringHeadFollow);
     _v3.addScaledVector(_n1, PLACE.earringOutward).normalize();
@@ -1710,12 +1592,10 @@ export class Engine3D {
       (facing - PLACE.earringFadeEnd) / (PLACE.earringFadeStart - PLACE.earringFadeEnd),
     );
 
-    // The ear region must also be inside the picture.
+    // The ear region must also be inside the picture
     if (face && !allInFrame(face, [earIdx, jawIdx])) turned = 0;
 
-    // Multiplied by the head pose's own confidence, which carries the short hold after the…
-    // A hand over this ear hides this earring, and only this one — the test is against THIS…
-    // Green on the right ear, cyan on the left.
+    // Multiplied by the head pose's own confidence
     this._markAnchor(`ear${side}`, _pos, side > 0 ? 0x00ff66 : 0x00ddff);
 
     const covered = this._handCoverage(_pos, this._tracking, null);
@@ -1728,11 +1608,7 @@ export class Engine3D {
     this.place(inst, _pos, scale, _q1, alpha > 0.02, alpha);
   }
 
-  // The palm's own orthonormal frame, fitted to the whole knuckle fan.
-  // A single cross product of two landmark spans inherits the noise of both.
-  // Summing the fan's triangles instead weights each by its own area, so the
-  // wide reliable ones dominate and a shaky one barely registers — the same
-  // reason an area-weighted normal beats a face normal on a mesh.
+  // The palm's own orthonormal frame, fitted to the whole knuckle fan
   _handFrame(hand) {
     const wristLm = hand[HAND.wrist];
     const index = hand[HAND.indexMcp];
@@ -1756,11 +1632,11 @@ export class Engine3D {
     }
     if (!(area > 1e-6)) return null;
 
-    // The triangles disagreeing means the landmarks are not describing a palm.
+    // The triangles disagreeing means the landmarks are not describing a palm
     if (_hfNormal.length() < area * MIN_PALM_AGREEMENT) return null;
     _hfNormal.normalize();
 
-    // Across and along, both made exactly perpendicular to that normal.
+    // Across and along, both made exactly perpendicular to that normal
     this.lmToScreen(index, _hfP);
     this.lmToScreen(pinky, _hfQ);
     _hfAcross.subVectors(_hfQ, _hfP);
@@ -1778,9 +1654,7 @@ export class Engine3D {
     return _handFrameOut;
   }
 
-  // Which tracked hand is wearing the ring? Whichever shows the better ring
-  // finger — but the one already wearing it keeps it unless clearly beaten,
-  // so the ring never ping-pongs between two hands held side by side.
+  // Which tracked hand is wearing the ring? Whichever shows the better ring finger
   _pickRingHand(entry, tracking) {
     const options = [
       { hand: tracking.leftHand, miss: tracking.leftHandMiss, isRight: tracking.leftHandIsRight, slot: 0 },
@@ -1792,10 +1666,7 @@ export class Engine3D {
       const hand = option.hand;
       if (!hand || hand.length < 21) continue;
 
-      // Every landmark the placement reads must be genuinely in shot. MediaPipe
-      // extrapolates the ones it cannot see rather than dropping them, so this
-      // is the only thing standing between a half-visible hand and a ring
-      // floating on a finger that was never there.
+      // Every landmark the placement reads must be genuinely in shot
       if (!allInFrame(hand, RING_FINGER_CHAIN, RING_FRAME_MARGIN)) continue;
       if (!allInFrame(hand, RING_SUPPORT)) continue;
 
@@ -1810,7 +1681,7 @@ export class Engine3D {
     return best;
   }
 
-  // Finger thickness, from three independent cues rather than one gap.
+  // Finger thickness, from three independent cues rather than one gap
   _ringFingerWidth(entry, hand) {
     const cues = [
       this.dist3D(hand[9], hand[13]),                        // the ring finger's own knuckle gap
@@ -1820,7 +1691,7 @@ export class Engine3D {
 
     if (!cues.length) return 0;
 
-    // The median throws away a cue spoiled by one bad landmark.
+    // The median throws away a cue spoiled by one bad landmark
     const target = cues[Math.floor(cues.length / 2)] * PLACE.ringShaft;
 
     const prev = entry.fingerWidth || 0;
@@ -1830,7 +1701,7 @@ export class Engine3D {
     return entry.fingerWidth;
   }
 
-  // The ring is worn on one bone, so everything here is solved in the hand's own frame.
+  // The ring is worn on one bone, so everything here is solved in the hand's own frame
   updateRing(entry, tracking) {
     const pick = this._pickRingHand(entry, tracking);
     if (!pick) return false;
@@ -1839,8 +1710,7 @@ export class Engine3D {
     const frame = this._handFrame(hand);
     if (!frame) return false;
 
-    // Moving to the other hand invalidates both remembered values: the two hands
-    // are different sizes and face opposite ways.
+    // Moving to the other hand invalidates both remembered values:
     if (entry.ringSlot !== pick.slot) {
       entry.fingerWidth = 0;
       entry.dorsalSide = undefined;
@@ -1856,30 +1726,23 @@ export class Engine3D {
     if (axisLen < 1e-6) return false;
     axis.multiplyScalar(1 / axisLen);
 
-    // A finger pointing straight at the lens collapses to a dot in the image,
-    // and its direction — which is the ring's whole orientation — becomes
-    // whatever the depth noise says. Fade out rather than spin.
+    // A finger pointing straight at the lens collapses to a dot in the image
     const inPlane = Math.hypot(axis.x, axis.y);
     const axisScore = clamp01((inPlane - PLACE.ringMinAxisView) / PLACE.ringAxisBand);
     if (axisScore <= 0.01) return false;
 
-    // Which way is the back of the hand? From finger curl, which does not care
-    // about handedness — see dorsalSideFromCurl.
+    // Which way is the back of the hand? From finger curl
     _n2.copy(frame.normal);
     const curl = dorsalSideFromCurl(hand, this, _n2);
     if (curl !== 0) entry.dorsalSide = curl;
     else if (entry.dorsalSide === undefined) entry.dorsalSide = handSign(pick.isRight);
     _n2.multiplyScalar(PLACE.ringStoneOnBackOfHand ? entry.dorsalSide : -entry.dorsalSide);
 
-    // A second copy, forced toward the lens — the seat push is camera-relative
-    // where the orientation must never be.
+    // A second copy, forced toward the lens
     _n3.copy(frame.normal);
     if (_n3.z < 0) _n3.negate();
 
-    // Scale
-    // Fitted by the model's HOLE, so the finger fills it exactly. That is what
-    // a ring size IS, and it is why any new model lands correctly with no
-    // per-folder tuning.
+    // Scale: fitted by the model's HOLE, so the finger fills it exactly
     const fingerWidth = this._ringFingerWidth(entry, hand);
     if (!(fingerWidth > 1e-4)) return false;
     const fingerRadius = fingerWidth * 0.5;
@@ -1900,12 +1763,12 @@ export class Engine3D {
     // Orientation
     basisQuat(axis, _n2, _q1);
 
-    // The hand has left the picture — see _outOfFrame.
+    // The hand has left the picture — see _outOfFrame
     if (this._outOfFrame(_pos, scale)) return false;
 
     this._markAnchor('ring', _pos, 0xff44aa);
 
-    // The OTHER hand covering this one hides the ring.
+    // The OTHER hand covering this one hides the ring
     const alpha = pick.quality
       * axisScore
       * (1 - this._handCoverage(_pos, tracking, hand));
@@ -1914,10 +1777,7 @@ export class Engine3D {
     const inst = entry.instances[0];
     this.place(inst, _pos, scale, _q1, true, alpha);
 
-    // Occluder
-    // The mask has to FILL the ring's hole. Sized any smaller it sits inside the
-    // band entirely, occludes nothing, and the far side of the ring shows
-    // straight through the near side — which is what read as the band splitting.
+    // Occluder: the mask has to FILL the ring's hole
     const st = inst.state;
     _v6.set(0, 1, 0).applyQuaternion(st.quaternion);   // finger axis
     _v3.set(0, 0, 1).applyQuaternion(st.quaternion);   // back-of-hand dir
@@ -1930,9 +1790,9 @@ export class Engine3D {
     const maskRadius = st.scale * radiusRatio;
 
     _mPos.set(st.position.x, st.position.y, st.depth)
-      // Undo the seat push, back onto the finger's own centre line.
+      // Undo the seat push, back onto the finger's own centre line
       .addScaledVector(_v3, fingerRadius * PLACE.ringDepth)
-      // Seat point → middle of the phalanx, where the mask is centred.
+      // Seat point → middle of the phalanx, where the mask is centred
       .addScaledVector(_v6, axisLen * (0.5 - PLACE.ringSeat));
     _mScale.set(maskRadius, st.scale * lengthRatio, maskRadius);
 
@@ -1941,12 +1801,7 @@ export class Engine3D {
     return true;
   }
 
-  // Are these two slots really holding the same physical hand? When one hand
-  // leaves, the tracker keeps serving a held copy of it in the vacated slot for
-  // a few frames, and that copy sits right on top of the hand still being
-  // tracked. Two slots, two instances, one wrist — two bangles on one arm.
-  // A held copy shadows the live hand almost exactly, which no two real hands
-  // ever do, so comparing the whole knuckle row tells them apart safely.
+  // Are these two slots really holding the same physical hand? When one hand leaves
   _sameHand(a, b) {
     if (!a || !b) return false;
 
@@ -1956,8 +1811,7 @@ export class Engine3D {
       sum += this.dist2D(a[i], b[i]);
     }
 
-    // Judged against the hands' own size, so the test means the same thing
-    // near the lens and far from it.
+    // Judged against the hands' own size
     const span = Math.max(
       this.dist2D(a[HAND.indexMcp], a[HAND.pinkyMcp]),
       this.dist2D(b[HAND.indexMcp], b[HAND.pinkyMcp]),
@@ -1966,15 +1820,14 @@ export class Engine3D {
     return sum / SAME_HAND_POINTS.length < span * SAME_HAND_LIMIT;
   }
 
-  // A bracelet is worn as a pair, so instance 0 follows one hand and instance 1 the other.
+  // A bracelet is worn as a pair, so instance 0 follows one hand and instance 1 the other
   updateBracelet(entry, tracking) {
     const hands = [tracking.leftHand, tracking.rightHand];
     const sides = [tracking.leftHandIsRight, tracking.rightHandIsRight];
     const misses = [tracking.leftHandMiss, tracking.rightHandMiss];
     let placed = 0;
 
-    // One wrist wears one bangle. If both slots resolve to the same wrist, the
-    // staler of the two is the held copy — drop it and place a single bangle.
+    // One wrist wears one bangle
     if (this._sameHand(hands[0], hands[1])) {
       const stale = (misses[0] ?? 0) >= (misses[1] ?? 0) ? 0 : 1;
       hands[stale] = null;
@@ -1997,7 +1850,6 @@ export class Engine3D {
     }
 
     // Single-instance fallback:
-    // on whichever hand is in view.
     if (!placed && entry.instances.length === 1) {
       const hand = tracking.primaryHand;
       if (!hand || hand.length < 21 || !allInFrame(hand, WRIST_CHAIN)) return false;
@@ -2011,10 +1863,7 @@ export class Engine3D {
     return placed > 0;
   }
 
-  // Elbow → wrist, from Pose, for whichever arm this hand belongs to.
-  // A bangle is worn on the FOREARM. Reading its direction off the palm instead
-  // means every wrist flex swings the bangle with the hand, which is most of
-  // what made it look stuck on rather than worn.
+  // Elbow → wrist, from Pose, for whichever arm this hand belongs to
   _forearmAxis(hand, tracking, out) {
     const pose = tracking?.pose;
     if (!pose || pose.length <= POSE.rightWrist) return 0;
@@ -2022,7 +1871,7 @@ export class Engine3D {
     const handWrist = hand[HAND.wrist];
     if (!handWrist) return 0;
 
-    // Match by position, not by side: Pose and Hands label sides independently.
+    // Match by position, not by side:
     let best = null;
     let bestDist = FOREARM_MATCH_RADIUS;
     for (const [elbowIdx, wristIdx] of FOREARM_PAIRS) {
@@ -2042,13 +1891,12 @@ export class Engine3D {
     if (out.lengthSq() < 1e-9) return 0;
     out.normalize();
 
-    // Trusted in proportion to how well Pose sees the arm and how closely its
-    // wrist agrees with the hand's own — never as a hard switch.
+    // Trusted in proportion to how well Pose sees the arm and how closely its wrist agrees with the
     return clamp01((best.seen - FOREARM_MIN_VISIBILITY) / 0.25)
       * clamp01(1 - bestDist / FOREARM_MATCH_RADIUS);
   }
 
-  // A bangle hangs loose on the forearm, so it is solved on the forearm's frame.
+  // A bangle hangs loose on the forearm, so it is solved on the forearm's frame
   _placeBracelet(entry, inst, hand, slot, isRight, alpha = 1, tracking = null) {
     const index = slot === 1 ? 1 : 0;
     const frame = this._handFrame(hand);
@@ -2056,21 +1904,16 @@ export class Engine3D {
 
     this.lmToScreen(hand[HAND.wrist], _v1);
 
-    // Forearm axis
-    // The hand only ever gives an approximation of it — the palm is hinged at
-    // the wrist. Pose's elbow gives the real thing, and is blended in by how
-    // well it is actually seen.
+    // Forearm axis: the hand only ever gives an approximation of it — the palm is hinged at the wrist
     _n1.copy(frame.along).negate();                   // knuckles → wrist, toward the elbow
     const trust = this._forearmAxis(hand, tracking || this._tracking, _v7);
     if (trust > 0) {
       _v7.negate();                                   // elbow → wrist, reversed
-      // Only if the two broadly agree; a mismatch means Pose latched the wrong arm.
+      // Only if the two broadly agree; a mismatch means Pose latched the wrong arm
       if (_v7.dot(_n1) > 0.2) _n1.lerp(_v7, trust * PLACE.forearmTrust).normalize();
     }
 
-    // Roll
-    // Which way the back of the hand faces, from finger curl — held per slot,
-    // since the two hands are tracked independently.
+    // Roll: which way the back of the hand faces
     _n2.copy(frame.normal);
     const curl = dorsalSideFromCurl(hand, this, _n2);
     const key = slot === 1 ? 'dorsalSideB' : 'dorsalSideA';
@@ -2078,12 +1921,12 @@ export class Engine3D {
     else if (entry[key] === undefined) entry[key] = handSign(isRight);
     _n2.multiplyScalar(entry[key]);
 
-    // Made square to the forearm axis actually in use, not to the palm's.
+    // Made square to the forearm axis actually in use, not to the palm's
     _n2.addScaledVector(_n1, -_n1.dot(_n2));
     if (_n2.lengthSq() < 1e-9) return;
     _n2.normalize();
 
-    // A second copy forced toward the lens — seat correction only, never orientation.
+    // A second copy forced toward the lens — seat correction only, never orientation
     _n3.copy(_n2);
     if (_n3.z < 0) _n3.negate();
 
@@ -2100,8 +1943,7 @@ export class Engine3D {
     entry[widthKey] = wristWidth;
     const wristRadius = wristWidth * 0.5;
 
-    // Fitted by the model's own hole, exactly as the ring is, so a bangle sized
-    // for a wrist arrives sized for a wrist whatever the file says.
+    // Fitted by the model's own hole
     const inner = entry.analysis?.innerRadius || 0;
     const scale = Math.max(
       inner > 1e-4
@@ -2118,9 +1960,7 @@ export class Engine3D {
       .addScaledVector(_n1, wristWidth * PLACE.braceletSlide)
       .addScaledVector(_n3, -wristRadius * PLACE.braceletDepth);
 
-    // A real bangle is loose and gravity parks it on the underside of the wrist.
-    // The distance is not a guess — it is the measured slack between the hole
-    // and the arm, so a wide kada rides low and a snug one hardly moves.
+    // A real bangle is loose and gravity parks it on the underside of the wrist
     const sag = slack * PLACE.bangleSag;
     _v6.set(0, -1, 0).addScaledVector(_n1, _n1.y);   // screen-down, square to the arm
     if (_v6.lengthSq() > 1e-9) {
@@ -2133,7 +1973,7 @@ export class Engine3D {
     // Orientation
     basisQuat(_n1, _n2, _q1);
 
-    // Gone from the picture, or covered by the OTHER hand.
+    // Gone from the picture, or covered by the OTHER hand
     this._markAnchor(`wrist${index}`, _pos, 0xff8800);
 
     const visible = alpha * (1 - this._handCoverage(_pos, this._tracking, hand));
@@ -2145,17 +1985,13 @@ export class Engine3D {
 
     this.place(inst, _pos, scale, _q1, true, visible);
 
-    // Occluder
-    // An ELLIPTICAL forearm, sized to the real wrist rather than to the bangle.
-    // That is what makes it read as worn: the arm passes in front of the bangle's
-    // far side and hides it, while the slack at the top stays open to the light
-    // exactly as it does on a real one.
+    // Occluder: an ELLIPTICAL forearm, sized to the real wrist rather than to the bangle
     const st = inst.state;
     _v3.set(0, 1, 0).applyQuaternion(st.quaternion);   // forearm axis, smoothed
     _v4.set(0, 0, 1).applyQuaternion(st.quaternion);   // wrist depth axis, smoothed
     if (_v4.z < 0) _v4.negate();
 
-    // Screen-down in the smoothed frame, so the sag can be taken back off.
+    // Screen-down in the smoothed frame, so the sag can be taken back off
     _v8.set(0, -1, 0).addScaledVector(_v3, _v3.y);
     if (_v8.lengthSq() > 1e-9) _v8.normalize();
     else _v8.set(0, 0, 0);
@@ -2165,13 +2001,13 @@ export class Engine3D {
     const toElbow = palmWidth * PLACE.forearmMaskToElbow;
 
     _mPos.set(st.position.x, st.position.y, st.depth)
-      // The arm does not sag with the bangle, and it does not take the seat push.
+      // The arm does not sag with the bangle, and it does not take the seat push
       .addScaledVector(_v8, -st.scale * sag * inv)
       .addScaledVector(_v4, st.scale * wristRadius * PLACE.braceletDepth * inv)
-      // Centre of a mask that reaches further up the arm than down it.
+      // Centre of a mask that reaches further up the arm than down it
       .addScaledVector(_v3, st.scale * (toElbow - toHand) * 0.5 * inv);
 
-    // Ratios, so the mask inherits the bangle's smoothed size along with its pose.
+    // Ratios, so the mask inherits the bangle's smoothed size along with its pose
     const wide = st.scale * wristRadius * inv;
     _mScale.set(wide, st.scale * (toElbow + toHand) * inv, wide * PLACE.wristDepthRatio);
     this._placeMask(
@@ -2182,8 +2018,7 @@ export class Engine3D {
   // Frame update
 
   update(tracking) {
-    // A null tracking result means "nothing detected" — items fade out
-    // rather than freezing wherever they last were.
+    // A null tracking result means "nothing detected"
     if (!tracking) tracking = {};
 
     // Frame timing
@@ -2192,24 +2027,20 @@ export class Engine3D {
     this._lastFrameTime = now;
     this._dtScale = Math.min(Math.max(elapsed * 60, 0.25), 3);
 
-    // How stale the face landmarks are this frame.
+    // How stale the face landmarks are this frame
     this._faceMiss = tracking.faceMiss ?? 0;
     // Held for the helpers reached through the per-category updates, which do not carry the…
     this._tracking = tracking;
 
-    // Anchor dots are opt-in per frame, like the masks.
+    // Anchor dots are opt-in per frame, like the masks
     if (this.showAnchors) {
       for (const mark of this._anchorMarks.values()) mark.visible = false;
     }
 
     // Occluders are opt-in per frame:
-    // the mask it needs.
-    // over the video after its jewellery has faded out.
     this._resetOccluders();
 
-    // One head-pose solve per frame, shared by the necklace and both earrings
-    // rather than recomputed per item.
-    // second.
+    // One head-pose solve per frame
     this._updateHeadPose(tracking.face);
     this._updateTorsoPose(tracking.pose);
 
@@ -2241,13 +2072,13 @@ export class Engine3D {
     this.renderer.render(this.scene, this.camera);
   }
 
-  // Which trackers actually need to run this frame, and how many hands.
+  // Which trackers actually need to run this frame, and how many hands
   requiredTrackers() {
     let face = false;
     let hands = false;
     let pose = false;
     let handCount = 1;
-    // The accurate hand model, needed only when a piece sits ON the hand.
+    // The accurate hand model, needed only when a piece sits ON the hand
     let precise = false;
 
     for (const [, entry] of this.activeItems) {
@@ -2258,22 +2089,19 @@ export class Engine3D {
       }
       if (entry.category === 'necklace') pose = true;
       if (entry.category === 'ring' || entry.category === 'bracelet') hands = true;
-      // Only the ring reads individual finger joints, and only it is worth the
-      // heavier model — a bangle needs the wrist and knuckles, which the light
-      // one already places well.
+      // Only the ring reads individual finger joints
       if (entry.category === 'ring') precise = true;
-      // A bangle rides the forearm, so Pose's elbow is what keeps it off the hand.
+      // A bangle rides the forearm, so Pose's elbow is what keeps it off the hand
       if (entry.category === 'bracelet') pose = true;
-      // A paired bangle needs both wrists detected.
+      // A paired bangle needs both wrists detected
       if (entry.category === 'bracelet' && entry.instances.length === 2) handCount = 2;
     }
     return { face, hands, pose, handCount, precise };
   }
 
-  // Composites the camera frame and the rendered jewellery into one canvas.
+  // Composites the camera frame and the rendered jewellery into one canvas
   captureComposite(video) {
-    // Guarantee the overlay is present in the drawing buffer we are about to
-    // read, rather than trusting that the last animation frame survived.
+    // Guarantee the overlay is present in the drawing buffer we are about to read
     this.renderer.render(this.scene, this.camera);
 
     const dpr = this.renderer.getPixelRatio();
@@ -2289,8 +2117,7 @@ export class Engine3D {
     ctx.imageSmoothingQuality = 'high';
     ctx.scale(dpr, dpr);
 
-    // Draw the video with the same mirror + cover crop the page uses,
-    // so the saved image matches what is on screen.
+    // Draw the video with the same mirror + cover crop the page uses
     ctx.save();
     ctx.translate(w, 0);
     ctx.scale(-1, 1);
@@ -2299,13 +2126,12 @@ export class Engine3D {
     }
     ctx.restore();
 
-    // The overlay canvas is dpr-sized internally; drawing it into the CSS-unit
-    // coordinate space we just set up maps it back 1:1.
+    // The overlay canvas is dpr-sized internally
     ctx.drawImage(this.renderer.domElement, 0, 0, w, h);
     return composite;
   }
 
-  // Kept for callers that want a data URL.
+  // Kept for callers that want a data URL
   screenshot(video) {
     return this.captureComposite(video).toDataURL('image/png');
   }
@@ -2316,7 +2142,7 @@ export class Engine3D {
     return this.activeItems.get(id)?.tuning ?? null;
   }
 
-  // `scale`, `offset*`, `anchor` and the material overrides apply instantly.
+  // `scale`, `offset*`, `anchor` and the material overrides apply instantly
   updateTuning(id, patch) {
     const entry = this.activeItems.get(id);
     if (!entry) return null;
@@ -2395,7 +2221,7 @@ function normalizeModel(object, category, tuning) {
   rotateWorld(object, 0, 0, 1, (tuning.rotZ || 0) * DEG);
   object.updateMatrixWorld(true);
 
-  // Measure AFTER rotating.
+  // Measure AFTER rotating
   const box = new THREE.Box3().setFromObject(object);
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
@@ -2403,16 +2229,14 @@ function normalizeModel(object, category, tuning) {
   const fit = tuning.fitAxis === 'y' ? size.y : tuning.fitAxis === 'z' ? size.z : size.x;
   const norm = 1 / Math.max(fit, 1e-6);
 
-  // matrix = T · R · S, so a geometry point maps to `position + R·(s·p)`.
-  // The rotated centre must therefore be cancelled *after* scaling.
+  // matrix = T · R · S, so a geometry point maps to `position + R·(s·p)`
   object.scale.setScalar(norm);
   object.position.copy(center).multiplyScalar(-norm);
   object.updateMatrixWorld(true);
 
   const normSize = size.clone().multiplyScalar(norm);
 
-  // Pivot correction
-  // Necklaces get their own treatment
+  // Pivot correction: necklaces get their own treatment
   let opening = null;
   let wrapped = false;
   if (category === 'necklace') {
@@ -2421,7 +2245,7 @@ function normalizeModel(object, category, tuning) {
       object.position.sub(opening.center);
       object.updateMatrixWorld(true);
 
-      // Bend a flat necklace around the neck — see wrapNecklaceAroundNeck.
+      // Bend a flat necklace around the neck — see wrapNecklaceAroundNeck
       if (normSize.z < normSize.x * NECK_WRAP_FLATNESS) {
         bakeTransformIntoGeometry(object);
         wrapNecklaceAroundNeck(object, opening.width * 0.5);
@@ -2445,13 +2269,11 @@ function normalizeModel(object, category, tuning) {
     const finalBox = new THREE.Box3().setFromObject(object);
     if (Number.isFinite(finalBox.min.y)) dropBelow = Math.max(-finalBox.min.y, 0);
     if (Number.isFinite(finalBox.max.y)) riseAbove = Math.max(finalBox.max.y, 0);
-    // Only a wrap sorts front from back; without one, assume the worst.
+    // Only a wrap sorts front from back; without one, assume the worst
     frontRise = wrapped ? measureFrontRise(object, opening.width * 0.5) : riseAbove;
   }
 
-  // A ring and a bangle are both worn THROUGH their hole, so the hole is what
-  // the limb has to be fitted to — measure it once, here, rather than guessing
-  // an outer diameter per folder for the rest of time.
+  // A ring and a bangle are both worn THROUGH their hole
   const hoop = (category === 'ring' || category === 'bracelet')
     ? measureHoopRadii(object)
     : null;
@@ -2463,22 +2285,22 @@ function normalizeModel(object, category, tuning) {
     normHeight: normSize.y,
     normDepth: normSize.z,
     pivot: pivot || new THREE.Vector3(),
-    // Width of the neck opening, in the same normalised units as normWidth.
+    // Width of the neck opening, in the same normalised units as normWidth
     openWidth: opening ? opening.width : normSize.x,
     dropBelow,
     // How far the piece extends ABOVE its opening — for a necklace, how high the chain arcs…
     riseAbove,
-    // The same, counting only what ends up in FRONT of the neck — the chin clearance.
+    // The same, counting only what ends up in FRONT of the neck — the chin clearance
     frontRise,
-    // 0 when there is no measurable hole; the caller falls back to width sizing.
+    // 0 when there is no measurable hole; the caller falls back to width sizing
     innerRadius: hoop ? hoop.innerRadius : 0,
     outerRadius: hoop ? hoop.outerRadius : normSize.x * 0.5,
-    // Did this necklace get bent onto a cylinder? Its occluder depends on it.
+    // Did this necklace get bent onto a cylinder? Its occluder depends on it
     wrapped,
   };
 }
 
-// Inner and outer radius of a hoop, about its own axis, in normalised units.
+// Inner and outer radius of a hoop, about its own axis, in normalised units
 function measureHoopRadii(object) {
   object.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(object);
@@ -2504,50 +2326,38 @@ function measureHoopRadii(object) {
   radii.sort((a, b) => a - b);
 
   const at = (f) => radii[Math.min(radii.length - 1, Math.floor(radii.length * f))];
-  // Percentiles rather than the extremes, so one stray vertex cannot define the hole.
+  // Percentiles rather than the extremes, so one stray vertex cannot define the hole
   const inner = at(HOOP_INNER_PERCENTILE);
   const outer = at(1 - HOOP_INNER_PERCENTILE);
   if (!(outer > 1e-6)) return null;
 
-  // No real hole — a solid pendant-like shape. Say so instead of inventing one.
+  // No real hole — a solid pendant-like shape
   if (inner < outer * HOOP_MIN_HOLE) return null;
 
   return { innerRadius: inner, outerRadius: outer };
 }
 
-// Where the hole edge is taken from in the sorted radii, and the smallest
-// hole-to-outer ratio that still counts as a hoop at all.
+// Where the hole edge is taken from in the sorted radii
 const HOOP_INNER_PERCENTILE = 0.02;
 const HOOP_MIN_HOLE = 0.25;
 
 // A necklace flatter than this fraction of its own width is a planar cut-out and gets…
 const NECK_WRAP_FLATNESS = 0.25;
 
-// Exactly a quarter turn, and it MUST be exactly that. The front branch below
-// reaches this at the opening's widest point and the back branch reaches twice
-// it at the centre. Only at 90° do the two branches meet at the sides (both
-// give ±90°) AND close at the back (+180° and -180° are the same point). Any
-// other value tears the chain open at one seam or the other.
+// Exactly a quarter turn, and it MUST be exactly that
 const NECK_WRAP_ANGLE = 90 * DEG;
 
-// A loop needs this much material above its opening to count as having a back.
+// A loop needs this much material above its opening to count as having a back
 const NECK_BACK_MIN = 0.05;
 
-// How much of that rise the swing to the back is spread over.
+// How much of that rise the swing to the back is spread over
 const NECK_BACK_BLEND = 0.5;
 
-// Bends a flat necklace onto the neck.
-// A necklace model is a CLOSED LOOP lying in a plane. The part below its
-// opening is the chain that shows at the throat; the part above it is the
-// clasp and the rear chain. Sending x straight to an angle puts that rear part
-// across the front of the throat — which is what made the back of the chain
-// appear on the neck. So the loop is mapped around the neck the way it is
-// actually worn: its outline runs the full circle, front at the bottom, clasp
-// at the nape, and the two halves blend where they meet at the widest point.
+// Bends a flat necklace onto the neck
 function wrapNecklaceAroundNeck(object, radius) {
   if (!(radius > 1e-6)) return;
 
-  // How far the loop reaches above its opening — the rear chain's own extent.
+  // How far the loop reaches above its opening — the rear chain's own extent
   let rise = 0;
   object.traverse((child) => {
     if (!child.isMesh) return;
@@ -2557,7 +2367,7 @@ function wrapNecklaceAroundNeck(object, radius) {
     for (let i = 1; i < a.length; i += 3) if (a[i] > rise) rise = a[i];
   });
 
-  // An open arc has no rear chain to place, so it keeps the front mapping throughout.
+  // An open arc has no rear chain to place, so it keeps the front mapping throughout
   const span = rise > NECK_BACK_MIN ? rise * NECK_BACK_BLEND : 0;
 
   object.traverse((child) => {
@@ -2567,12 +2377,11 @@ function wrapNecklaceAroundNeck(object, radius) {
 
     const a = attr.array;
     for (let i = 0; i < a.length; i += 3) {
-      const t = a[i] / radius;                      // -1 .. 1 across the opening
+      const t = a[i] / radius;                      // -1
       const u = t < -1 ? -1 : t > 1 ? 1 : t;
 
       const front = u * NECK_WRAP_ANGLE;
-      // Mirrors the front branch about the sides, so the centre of the top bar
-      // lands at the nape and the seams match.
+      // Mirrors the front branch about the sides
       const back = (u < 0 ? -1 : 1) * NECK_WRAP_ANGLE * (2 - Math.abs(u));
 
       const y = a[i + 1];
@@ -2582,7 +2391,7 @@ function wrapNecklaceAroundNeck(object, radius) {
       const sin = Math.sin(angle);
       const cos = Math.cos(angle);
 
-      // The model's own depth becomes height above the cylinder.
+      // The model's own depth becomes height above the cylinder
       const r = radius + a[i + 2];
       // Anything wider than the opening — an unusually broad pendant — runs on along the…
       const overrun = (t - u) * radius;
@@ -2601,13 +2410,10 @@ function wrapNecklaceAroundNeck(object, radius) {
   });
 }
 
-// Only the front 120° of the neck is under the chin; the rest is off to the
-// side or behind it.
+// Only the front 120° of the neck is under the chin; the rest is off to the side or behind it
 const NECK_FRONT_CONE = 0.5;
 
-// How far the piece rises above its anchor at the FRONT, where it could reach
-// the chin. Measured after the wrap, because that is what decides which part of
-// the loop ends up at the throat and which ends up behind the neck.
+// How far the piece rises above its anchor at the FRONT, where it could reach the chin
 function measureFrontRise(object, radius) {
   object.updateMatrixWorld(true);
   const near = radius * NECK_FRONT_CONE;
@@ -2620,7 +2426,7 @@ function measureFrontRise(object, radius) {
     for (let i = 0; i < pos.count; i += step) {
       _pv.fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
       if (!Number.isFinite(_pv.y) || !Number.isFinite(_pv.z)) continue;
-      // Anything off to the side or behind cannot reach the wearer's chin.
+      // Anything off to the side or behind cannot reach the wearer's chin
       if (_pv.z <= near) continue;
       if (_pv.y > rise) rise = _pv.y;
     }
@@ -2628,7 +2434,7 @@ function measureFrontRise(object, radius) {
   return rise;
 }
 
-// Folds the object's transform into its vertices and resets it to identity.
+// Folds the object's transform into its vertices and resets it to identity
 function bakeTransformIntoGeometry(object) {
   object.updateMatrixWorld(true);
 
@@ -2669,10 +2475,10 @@ function restoreBaseGeometry(object) {
   });
 }
 
-// How many horizontal slices the neck-opening scan uses.
+// How many horizontal slices the neck-opening scan uses
 const OPENING_BANDS = 48;
 
-// Locates a necklace's neck opening — the hole the wearer's neck goes through.
+// Locates a necklace's neck opening — the hole the wearer's neck goes through
 function findNeckOpening(object) {
   object.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(object);
@@ -2703,15 +2509,14 @@ function findNeckOpening(object) {
     }
   });
 
-  // Only the UPPER part of the model is considered.
+  // Only the UPPER part of the model is considered
   const searchFrom = Math.floor(OPENING_BANDS * 0.40);
 
   let best = -1;
   let bestWidth = 0;
   const scan = (from) => {
     for (let b = from; b < OPENING_BANDS; b++) {
-      // Ignore bands too sparse to be a real cross-section — a single stray
-      // vertex would otherwise define the opening.
+      // Ignore bands too sparse to be a real cross-section
       if (count[b] < 8 || hi[b] < lo[b]) continue;
       const width = hi[b] - lo[b];
       if (width > bestWidth) {
@@ -2722,8 +2527,7 @@ function findNeckOpening(object) {
   };
 
   scan(searchFrom);
-  // Nothing usable up there (a very unusual model) — fall back to the whole
-  // piece rather than giving up and leaving it unfitted.
+  // Nothing usable up there (a very unusual model)
   if (best < 0) scan(0);
 
   if (best < 0 || bestWidth < 1e-6) return null;
@@ -2738,14 +2542,14 @@ function findNeckOpening(object) {
   };
 }
 
-// Scratch for the pivot scan — allocated once, not per model.
+// Scratch for the pivot scan — allocated once, not per model
 const _pv = new THREE.Vector3();
 
-// Scratch for world-space model rotations.
+// Scratch for world-space model rotations
 const _rotAxis = new THREE.Vector3();
 const _rotQuat = new THREE.Quaternion();
 
-// Rotates a model about a WORLD axis, on top of whatever orientation it already has.
+// Rotates a model about a WORLD axis, on top of whatever orientation it already has
 function rotateWorld(object, x, y, z, angle) {
   if (!angle) return;
   _rotAxis.set(x, y, z).normalize();
@@ -2765,7 +2569,7 @@ function findPivot(object, category, norm) {
 
   const isHoop = category === 'ring' || category === 'bracelet' || category === 'necklace';
 
-  // Band to average over.
+  // Band to average over
   const loFrac = isHoop ? 0.42 : 0.88;
   const hiFrac = isHoop ? 0.58 : 1.0;
   const loY = box.min.y + spanY * loFrac;
@@ -2779,8 +2583,7 @@ function findPivot(object, category, norm) {
     if (!child.isMesh) return;
     const pos = child.geometry?.attributes?.position;
     if (!pos || !pos.count) return;
-    // Same sampling budget as the flip test — a 300k-vertex model does not
-    // need every point to locate a centre.
+    // Same sampling budget as the flip test
     const step = Math.max(1, Math.floor(pos.count / 8000));
     for (let i = 0; i < pos.count; i += step) {
       _pv.fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
@@ -2790,8 +2593,7 @@ function findPivot(object, category, norm) {
     }
   });
 
-  // Too few samples to be meaningful — leave the box centre alone rather than
-  // moving the model somewhere arbitrary.
+  // Too few samples to be meaningful
   if (n < 12) return null;
 
   const cx = sx / n;
@@ -2801,14 +2603,13 @@ function findPivot(object, category, norm) {
   const out = new THREE.Vector3(cx, 0, cz);
 
   // Refuse absurd corrections:
-  // measurement noise on a weird mesh, not a genuine off-centre pivot.
   const limit = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * 0.34;
   if (out.length() > limit) return null;
 
   return out;
 }
 
-// Bounding-box guess at how the model is laid out in its source file.
+// Bounding-box guess at how the model is laid out in its source file
 function applyCanonicalRotation(object, size, category) {
   const dims = [size.x, size.y, size.z];
   const thin = dims.indexOf(Math.min(...dims));
@@ -2837,10 +2638,7 @@ function applyCanonicalRotation(object, size, category) {
     }
   }
 
-  // The step above gets the piece standing in the right plane, but it cannot
-  // tell +Y from -Y — that is a straight coin flip on the exporter's "up"
-  // axis, and losing it is what made pieces hang inverted.
-  // looking at where the material actually is.
+  // The step above gets the piece standing in the right plane
   if (category === 'earring' || category === 'necklace') {
     if (needsUpFlip(object, category)) {
       rotateWorld(object, 0, 0, 1, Math.PI);
@@ -2861,8 +2659,7 @@ function applyCanonicalRotation(object, size, category) {
 function needsFaceFlip(object) {
   object.updateMatrixWorld(true);
 
-  // Why this is not a bounding-box test
-  // Radii are measured from the ring's own centre, not from the model's origin.
+  // Why this is not a bounding-box test Radii are measured from the ring's own centre
   const box = new THREE.Box3().setFromObject(object);
   if (!Number.isFinite(box.min.x) || !Number.isFinite(box.min.z)) return false;
   const cx = (box.min.x + box.max.x) * 0.5;
@@ -2888,7 +2685,6 @@ function needsFaceFlip(object) {
   if (count < 64) return false;
 
   // The band's own radius:
-  // of a ring's surface IS band.
   const sorted = [...radii].sort((a, b) => a - b);
   const bandRadius = sorted[Math.floor(count * 0.5)];
   if (!(bandRadius > 1e-9)) return false;
@@ -2908,12 +2704,11 @@ function needsFaceFlip(object) {
   const strength = (front + back) / (count * bandRadius);
   if (strength < FACE_FLIP_MIN_STRENGTH) return false;
 
-  // Protrudes on both sides about equally — symmetric, so the choice is
-  // invisible. Leave it exactly as it is rather than reintroducing a flip.
+  // Protrudes on both sides about equally — symmetric, so the choice is invisible
   const bigger = Math.max(front, back);
   if (Math.min(front, back) > bigger * FACE_FLIP_MAX_SYMMETRY) return false;
 
-  // The ornament should end up on +Z.
+  // The ornament should end up on +Z
   return back > front;
 }
 
@@ -2921,7 +2716,7 @@ function needsFaceFlip(object) {
 const FACE_FLIP_MIN_STRENGTH = 0.010;
 const FACE_FLIP_MAX_SYMMETRY = 0.65;
 
-// How lopsided the two ends must be before the flip test trusts itself.
+// How lopsided the two ends must be before the flip test trusts itself
 const PROFILE_BANDS = 16;
 const PROFILE_RATIO = 1.2;
 // The bulk test integrates a whole third of the model, so it accumulates a much larger…
@@ -2945,8 +2740,7 @@ function endWidths(object) {
     if (!child.isMesh) return;
     const pos = child.geometry?.attributes?.position;
     if (!pos || !pos.count) return;
-    // Sample rather than scan — a 300k-vertex model doesn't need every point
-    // to tell us which end is wider.
+    // Sample rather than scan — a 300k-vertex model doesn't need every point to tell us which end is
     const step = Math.max(1, Math.floor(pos.count / 6000));
     for (let i = 0; i < pos.count; i += step) {
       v.fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
@@ -2966,7 +2760,7 @@ function endWidths(object) {
     return w;
   };
 
-  // Integrated cross-section — width times depth, summed over the bands.
+  // Integrated cross-section — width times depth, summed over the bands
   const bulk = (from, to) => {
     let sum = 0;
     for (let b = from; b < to; b++) {
@@ -2995,7 +2789,7 @@ function needsUpFlip(object, category) {
   if (w.top * PROFILE_RATIO < w.bottom) topNarrow = true;
   else if (w.bottom * PROFILE_RATIO < w.top) topNarrow = false;
   else if (w.topBulk > 0 && w.bottomBulk > 0) {
-    // Width was inconclusive — fall back to how much material each end holds.
+    // Width was inconclusive — fall back to how much material each end holds
     if (w.topBulk * PROFILE_BULK_RATIO < w.bottomBulk) topNarrow = true;
     else if (w.bottomBulk * PROFILE_BULK_RATIO < w.topBulk) topNarrow = false;
     else return false;
@@ -3043,13 +2837,10 @@ function scrubNaNVertices(geometry, label) {
 const ENV_MEAN_LUMINANCE = 0.13;
 
 // ►► HOW BRIGHT THE JEWELLERY LOOKS ◄◄
-// Metal takes nearly all of its colour from what it reflects — at high metalness
-// the diffuse term is zero and the lights barely touch it — so this, not the
-// lamps, is the dial. 1.0 is physically neutral; above that the highlights clip
-// to white, which on polished gold reads as shine rather than as blown out.
+// Metal takes nearly all of its colour from what it reflects
 const ENV_INTENSITY = 1.35;
 
-// A small equirectangular studio probe, written pixel by pixel.
+// A small equirectangular studio probe, written pixel by pixel
 function makeStudioEnvTexture() {
   const W = 64;
   const H = 32;
@@ -3064,9 +2855,9 @@ function makeStudioEnvTexture() {
   };
 
   for (let y = 0; y < H; y++) {
-    // 0 at the zenith, 1 at the nadir.
+    // 0 at the zenith, 1 at the nadir
     const v = y / (H - 1);
-    // Sky 0.62 → horizon 0.34 → floor 0.10.
+    // Sky 0.62 → horizon 0.34 → floor 0.10
     const base = v < 0.5
       ? 0.62 + (0.34 - 0.62) * (v / 0.5)
       : 0.34 + (0.10 - 0.34) * ((v - 0.5) / 0.5);
@@ -3105,7 +2896,7 @@ function handSign(isRight) {
   return 1;
 }
 
-// Scratch for the finger-curl solve.
+// Scratch for the finger-curl solve
 const _fcChord = new THREE.Vector3();
 const _fcBend = new THREE.Vector3();
 const _fcSum = new THREE.Vector3();
@@ -3128,15 +2919,14 @@ function dorsalSideFromCurl(hand, engine, normal) {
     engine.lmToScreen(pip, _fcPip);
     engine.lmToScreen(tip, _fcTip);
 
-    // Skip a deeply flexed finger.
+    // Skip a deeply flexed finger
     const path = _fcMcp.distanceTo(_fcPip) + _fcPip.distanceTo(_fcTip);
     const chord = _fcMcp.distanceTo(_fcTip);
     if (path < 1e-6 || chord / path < CURL_MIN_STRAIGHTNESS) continue;
 
     // Midpoint of the knuckle→tip chord:
-    // the finger were perfectly straight.
     _fcChord.addVectors(_fcMcp, _fcTip).multiplyScalar(0.5);
-    // How far, and which way, it actually departs from that line.
+    // How far, and which way, it actually departs from that line
     _fcBend.subVectors(_fcPip, _fcChord);
 
     _fcSum.add(_fcBend);
@@ -3154,7 +2944,7 @@ function dorsalSideFromCurl(hand, engine, normal) {
 // How pronounced the collective finger bow must be, as a fraction of finger length…
 const CURL_MIN_SIGNAL = 0.012;
 
-// Minimum chord-to-bone-path ratio for a finger's bow to be read.
+// Minimum chord-to-bone-path ratio for a finger's bow to be read
 const CURL_MIN_STRAIGHTNESS = 0.80;
 
 // Only used when a model ships NO material at all — no MTL, no colours, nothing to be…
@@ -3168,7 +2958,7 @@ function defaultMetalMaterial() {
   });
 }
 
-// Translates a loaded MTL material into a physically-based one, FAITHFULLY.
+// Translates a loaded MTL material into a physically-based one, FAITHFULLY
 function toPBRMaterial(src, options) {
   const maxAnisotropy = options?.maxAnisotropy || 1;
   const override = options?.override || {};
@@ -3182,7 +2972,7 @@ function toPBRMaterial(src, options) {
   };
 
   if (src.isMeshStandardMaterial || src.isMeshPhysicalMaterial) {
-    // Already PBR — respect it, and only make sure it fits the scene.
+    // Already PBR — respect it, and only make sure it fits the scene
     src.side = THREE.DoubleSide;
     tuneTexture(src.map);
     if (src.envMapIntensity === undefined) src.envMapIntensity = ENV_INTENSITY;
@@ -3226,7 +3016,7 @@ function toPBRMaterial(src, options) {
     out.specularColorMap = tuneTexture(src.specularMap);
   }
 
-  // Blinn-Phong exponent → roughness, by the usual approximation.
+  // Blinn-Phong exponent → roughness, by the usual approximation
   const shininess = typeof src.shininess === 'number' ? src.shininess : 30;
   out.roughness = Math.min(Math.max(Math.sqrt(2 / (shininess + 2)), 0.06), 0.9);
 
@@ -3248,10 +3038,7 @@ function toPBRMaterial(src, options) {
 
   // Gemstones
   if (out.transparent && out.opacity < 0.95) {
-    // Explicitly NOT metallic.
-    // does not exist — rendered as one it reads as grey smoke.
-    // the metalness derived above, which has no way of knowing that a low Ns
-    // on a transparent material means "gem", not "dull".
+    // Explicitly NOT metallic
     out.metalness = 0;
     out.roughness = Math.min(out.roughness, 0.06);
     out.ior = 2.0;
@@ -3259,14 +3046,13 @@ function toPBRMaterial(src, options) {
     out.envMapIntensity = ENV_INTENSITY * 1.4;
   }
 
-  // Lots of exported OBJs have inconsistent face winding, which makes half
-  // the model vanish under backface culling.
+  // Lots of exported OBJs have inconsistent face winding
   out.side = THREE.DoubleSide;
 
   return applyMaterialOverride(out, override);
 }
 
-// Per-folder material overrides from MODEL_TUNING.
+// Per-folder material overrides from MODEL_TUNING
 function applyMaterialOverride(material, override) {
   if (!material || !override) return material;
   if (typeof override.metalness === 'number') {
@@ -3281,14 +3067,13 @@ function applyMaterialOverride(material, override) {
   return material;
 }
 
-// Every MTL statement that names an image file.
+// Every MTL statement that names an image file
 const MTL_TEXTURE_LINE = /^\s*(map_ka|map_kd|map_ks|map_ke|map_ns|map_d|map_bump|bump|map_refl|norm|disp|decal)\s+(\S.*)$/i;
 
-// Removes texture statements whose image file is not actually there.
-// Image extensions worth trying when the exact filename an MTL names is not there.
+// Removes texture statements whose image file is not actually there
 const TEXTURE_EXTENSIONS = ['jpg', 'JPG', 'jpeg', 'JPEG', 'png', 'PNG', 'webp', 'WEBP'];
 
-// Every filename worth trying for one MTL texture reference.
+// Every filename worth trying for one MTL texture reference
 function textureCandidates(name) {
   const out = [name];
   const slash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
@@ -3300,7 +3085,7 @@ function textureCandidates(name) {
   const stem = file.slice(0, dot);
   const ext = file.slice(dot + 1);
 
-  // Ordered cheapest-likeliest first, and kept short.
+  // Ordered cheapest-likeliest first, and kept short
   out.push(`${dir}${stem}.${ext.toLowerCase()}`);
   out.push(`${dir}${stem}.${ext.toUpperCase()}`);
   out.push(`${dir}${stem.toLowerCase()}.${ext.toLowerCase()}`);
@@ -3309,7 +3094,7 @@ function textureCandidates(name) {
   return [...new Set(out)];
 }
 
-// Repairs an MTL's texture references against what is actually on disk.
+// Repairs an MTL's texture references against what is actually on disk
 async function stripMissingTextures(text, basePath) {
   const lines = text.split(/\r?\n/);
 
@@ -3327,9 +3112,7 @@ async function stripMissingTextures(text, basePath) {
         name,
         fetch(`${basePath}${encodeURI(name)}`, { method: 'HEAD', cache: 'no-cache' })
           .then((r) => (r.ok ? { ok: true, version: assetVersionSuffix(r.headers) } : { ok: false }))
-          // A network error is not proof the file is missing.
-          // present and let the texture loader try it properly, rather than
-          // stripping a good reference because the connection hiccuped.
+          // A network error is not proof the file is missing
           .catch(() => ({ ok: true, version: '' })),
       );
     }
@@ -3361,7 +3144,7 @@ async function stripMissingTextures(text, basePath) {
     }
     if (found.name !== name) repaired.push(`${name} → ${found.name}`);
 
-    // Replace only the final token, leaving any `-bm 0.02` options intact.
+    // Replace only the final token, leaving any `-bm 0.02` options intact
     const replacement = found.name + found.version;
     kept.push(lines[i].replace(/\S+(\s*)$/, (_, tail) => replacement + tail));
   }
@@ -3383,7 +3166,7 @@ async function stripMissingTextures(text, basePath) {
 // Welding vertices is O(n) but with a real constant, and it is done during a load the…
 const SMOOTH_WELD_LIMIT = 150000;
 
-// Makes a freshly parsed geometry safe and well-shaded.
+// Makes a freshly parsed geometry safe and well-shaded
 function prepareGeometry(geometry, label) {
   scrubNaNVertices(geometry, label);
 
@@ -3392,7 +3175,7 @@ function prepareGeometry(geometry, label) {
   const count = out.attributes.position?.count || 0;
 
   if (!normals || !normalsAreUsable(normals)) {
-    // Drop the unusable normals BEFORE welding, not after.
+    // Drop the unusable normals BEFORE welding, not after
     out.deleteAttribute('normal');
 
     if (!out.index && count > 0 && count <= SMOOTH_WELD_LIMIT) {
@@ -3415,7 +3198,7 @@ function prepareGeometry(geometry, label) {
   return out;
 }
 
-// A normal buffer full of zeros renders black, and some exporters emit exactly that.
+// A normal buffer full of zeros renders black, and some exporters emit exactly that
 function normalsAreUsable(attr) {
   const n = attr.count;
   if (!n) return false;
@@ -3456,10 +3239,10 @@ function collectMaterials(root) {
 
 // ASSET FRESHNESS
 
-// Resolved version suffixes, so one asset is probed once per session.
+// Resolved version suffixes, so one asset is probed once per session
 const _assetVersions = new Map();
 
-// Short, stable, URL-safe token for an arbitrary validator string.
+// Short, stable, URL-safe token for an arbitrary validator string
 function versionToken(text) {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
@@ -3469,13 +3252,12 @@ function versionToken(text) {
   return (h >>> 0).toString(36);
 }
 
-// Appends a content-derived version to an asset URL.
+// Appends a content-derived version to an asset URL
 async function versionedUrl(url) {
   if (!_assetVersions.has(url)) {
     _assetVersions.set(url, (async () => {
       try {
         // `no-cache` on the probe itself:
-        // cache is would defeat the purpose.
         const res = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
         if (!res.ok) return '';
         return assetVersionSuffix(res.headers);
@@ -3487,13 +3269,12 @@ async function versionedUrl(url) {
   return url + (await _assetVersions.get(url));
 }
 
-// Builds the `?v=` suffix from whatever validators a response carries.
+// Builds the `?v=` suffix from whatever validators a response carries
 function assetVersionSuffix(headers) {
   const etag = headers.get('etag');
   const length = headers.get('content-length');
   const modified = headers.get('last-modified');
-  // Length first, because it is the one validator that changes when a model
-  // is swapped for a different one carrying the same archive timestamp.
+  // Length first, because it is the one validator that changes when a model is swapped for a
   const validator = [length, etag, modified].filter(Boolean).join('|');
   return validator ? `?v=${versionToken(validator)}` : '';
 }
@@ -3535,8 +3316,7 @@ const OBJ_CANDIDATES = ['model.obj', 'scene.obj', '1.obj', '2.obj', '3.obj'];
 export async function resolveObjFile(folder) {
   for (const name of [...OBJ_CANDIDATES, `${folder}.obj`]) {
     try {
-      // no-cache, so a folder that has just had its first model dropped in is
-      // not reported empty because an earlier 404 was cached.
+      // no-cache, so a folder that has just had its first model dropped in is not reported empty
       const res = await fetch(`objects/${folder}/${name}`, { method: 'HEAD', cache: 'no-cache' });
       if (res.ok) return name;
     } catch {
@@ -3551,7 +3331,7 @@ export async function probeFolder(folder) {
   return objFile ? { folder, objFile, available: true } : { folder, available: false };
 }
 
-// The four categories the engine knows how to PLACE.
+// The four categories the engine knows how to PLACE
 export const CATEGORY_ORDER = ['necklace', 'earring', 'ring', 'bracelet'];
 
 export const CATEGORY_LABELS = {
@@ -3561,7 +3341,7 @@ export const CATEGORY_LABELS = {
   bracelet: 'Bangles',
 };
 
-// Fallback list, used only when objects/index.json is absent.
+// Fallback list, used only when objects/index.json is absent
 export const FOLDER_CATALOG = [
   'necklace-gold', 'necklace-diamond', 'necklace-mala',
   'earring-gold', 'earring-diamond', 'earring-hoop',
@@ -3569,7 +3349,7 @@ export const FOLDER_CATALOG = [
   'bangle-gold', 'bangle-diamond',
 ];
 
-// Reads objects/index.json, if there is one.
+// Reads objects/index.json, if there is one
 async function readManifest() {
   try {
     const res = await fetch('objects/index.json', { cache: 'no-cache' });
@@ -3593,13 +3373,12 @@ async function readManifest() {
     }
     return entries.length ? entries : null;
   } catch {
-    // No manifest, or it is not valid JSON.
-    // surfacing — the fallback list covers it.
+    // No manifest, or it is not valid JSON
     return null;
   }
 }
 
-// Every jewellery item the app should offer, with its model file resolved.
+// Every jewellery item the app should offer, with its model file resolved
 export async function discoverItems() {
   const entries = (await readManifest()) || FOLDER_CATALOG.map((folder) => ({ folder }));
 
@@ -3626,7 +3405,7 @@ export async function discoverItems() {
   return probed.filter(Boolean);
 }
 
-// Names that mean the same category.
+// Names that mean the same category
 const CATEGORY_ALIASES = {
   bangle: 'bracelet',
   bangles: 'bracelet',
@@ -3646,15 +3425,14 @@ function normaliseCategory(value) {
   return CATEGORY_ALIASES[v] || null;
 }
 
-// Works out which category a folder belongs to from its name.
+// Works out which category a folder belongs to from its name
 export function folderToCategory(folder) {
   const words = String(folder).toLowerCase().split(/[-_\s]+/).filter(Boolean);
   for (const word of words) {
     const hit = normaliseCategory(word);
     if (hit) return hit;
   }
-  // Last resort: the category word may be run together with something else,
-  // as in "goldnecklace".
+  // Last resort:
   const joined = words.join('');
   for (const cat of CATEGORY_ORDER) {
     if (joined.includes(cat)) return cat;
@@ -3662,7 +3440,7 @@ export function folderToCategory(folder) {
   return null;
 }
 
-// A readable name, with the category word moved to the end.
+// A readable name, with the category word moved to the end
 export function folderToLabel(folder, category) {
   const cat = category || folderToCategory(folder);
   const words = String(folder).split(/[-_\s]+/).filter(Boolean);

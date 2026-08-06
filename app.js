@@ -1,4 +1,4 @@
-// "vto/" specifiers, not relative paths — see the import map in index.html.
+// "vto/" specifiers, not relative paths — see the import map in index.html
 import { MediaPipeTracker, getTrackingLabel } from 'vto/mediapipe.js';
 import {
   Engine3D,
@@ -30,7 +30,7 @@ const tracker = new MediaPipeTracker();
 
 let stream = null;
 let running = false;
-// The jewellery UI is inert until the camera is live.
+// The jewellery UI is inert until the camera is live
 let cameraOn = false;
 let rafId = null;
 let catalogue = [];
@@ -39,7 +39,7 @@ let lastLabel = '';
 const activeByCategory = new Map();
 const activeIds = new Set();
 
-// In-flight load per category, identified by a monotonic token.
+// In-flight load per category, identified by a monotonic token
 const pendingByCategory = new Map();
 let requestSeq = 0;
 
@@ -158,7 +158,7 @@ async function discoverCatalogue() {
   }
 }
 
-// Groups whatever was discovered, in a stable order.
+// Groups whatever was discovered, in a stable order
 function groupCatalogue() {
   const seen = new Set(catalogue.map((c) => c.category));
   return CATEGORY_ORDER
@@ -218,13 +218,12 @@ function getButton(id) {
   return jewelleryControls.querySelector(`[data-id="${id}"]`);
 }
 
-// Locks or unlocks the whole jewellery panel.
+// Locks or unlocks the whole jewellery panel
 function setJewelleryEnabled(enabled) {
   const buttons = jewelleryControls.querySelectorAll('.jewellery-btn');
   for (const btn of buttons) {
     if (btn.classList.contains('unavailable')) continue;
-    // A button mid-download belongs to toggleJewellery until its load settles;
-    // its own `finally` hands it back in whatever state the camera is then in.
+    // A button mid-download belongs to toggleJewellery until its load settles
     if (btn.classList.contains('loading')) continue;
 
     btn.classList.toggle('locked', !enabled);
@@ -245,13 +244,12 @@ function syncTrackerNeeds() {
   const need = engine.requiredTrackers();
   tracker.setNeeds(need);
 
-  // Start pulling the models we're about to need, so the first tracked frame
-  // isn't the one that pays for the download.
+  // Start pulling the models we're about to need
   const keys = ['face', 'hands', 'pose'].filter((k) => need[k]);
   tracker.warmup(keys.length ? keys : ['face']);
 }
 
-// Turns one piece of jewellery off, everywhere.
+// Turns one piece of jewellery off, everywhere
 function deactivateItem(id) {
   if (!id) return;
   engine.deactivate(id);
@@ -269,7 +267,7 @@ async function toggleJewellery(item, btn) {
   // The camera rule is enforced HERE, not by disabling the button — see…
   if (!cameraOn) {
     showNotification(CAMERA_OFF_MESSAGE);
-    // Draw the eye to the control that unblocks them.
+    // Draw the eye to the control that unblocks them
     btnStart.focus({ preventScroll: true });
     btnStart.classList.remove('nudge');
     void btnStart.offsetWidth;
@@ -279,9 +277,7 @@ async function toggleJewellery(item, btn) {
 
   // OFF
   if (activeIds.has(item.id)) {
-    // Cancel any load still in flight for this category, so a slow download
-    // started earlier cannot come back and switch something on after the
-    // user has just switched it off.
+    // Cancel any load still in flight for this category
     pendingByCategory.delete(item.category);
     deactivateItem(item.id);
     syncTrackerNeeds();
@@ -292,7 +288,7 @@ async function toggleJewellery(item, btn) {
 
   // ON
 
-  // Only one item per category at a time.
+  // Only one item per category at a time
   deactivateItem(activeByCategory.get(item.category)?.id);
 
   // A token identifying THIS request, so a load that finishes after the user has moved on…
@@ -300,7 +296,7 @@ async function toggleJewellery(item, btn) {
   pendingByCategory.set(item.category, token);
   const superseded = () => pendingByCategory.get(item.category) !== token;
 
-  // Marked busy with a class and aria-busy, NOT with the `disabled` attribute.
+  // Marked busy with a class and aria-busy, NOT with the `disabled` attribute
   setButtonState(btn, 'loading');
   btn.setAttribute('aria-busy', 'true');
   btn.textContent = 'Loading…';
@@ -316,8 +312,7 @@ async function toggleJewellery(item, btn) {
     );
 
     if (superseded()) {
-      // The user changed their mind while this was downloading.
-      // stays in the cache, so choosing it again is instant.
+      // The user changed their mind while this was downloading
       setButtonState(btn, 'off');
       return;
     }
@@ -340,8 +335,7 @@ async function toggleJewellery(item, btn) {
     hideLoading();
     btn.textContent = item.label;
     btn.removeAttribute('aria-busy');
-    // If the camera was stopped while this was downloading, hand the button
-    // back locked rather than live.
+    // If the camera was stopped while this was downloading
     btn.classList.toggle('locked', !cameraOn);
     btn.setAttribute('aria-disabled', String(!cameraOn));
   }
@@ -374,9 +368,7 @@ async function startCamera() {
     cameraOn = true;
     setJewelleryEnabled(true);
 
-    // Tracking failing must not take the camera preview down with it — the
-    // models download lazily, so this only throws if the CDN scripts are
-    // genuinely missing.
+    // Tracking failing must not take the camera preview down with it — the models download lazily
     if (!tracker.ready) {
       try {
         await tracker.init();
@@ -428,7 +420,7 @@ function stopCamera() {
   setTrackingUI('Camera off', 'offline');
 }
 
-// Rendering runs on its own rAF loop, independent of tracking.
+// Rendering runs on its own rAF loop, independent of tracking
 function renderLoop() {
   if (!running) return;
   rafId = requestAnimationFrame(renderLoop);
@@ -440,7 +432,7 @@ function renderLoop() {
   }
 }
 
-// Tracking runs as fast as it can, and never blocks rendering.
+// Tracking runs as fast as it can, and never blocks rendering
 async function trackingPump() {
   while (running) {
     try {
@@ -454,7 +446,7 @@ async function trackingPump() {
         label = 'Tracking unavailable';
         state = 'offline';
       } else if (!tracker.warm && activeCategories.length) {
-        // First frame is still downloading the WASM + model files.
+        // First frame is still downloading the WASM + model files
         label = 'Loading AI model…';
         state = 'loading';
       } else {
@@ -475,7 +467,7 @@ function nextFrame() {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()));
 }
 
-// Saves the camera frame and the jewellery as one image.
+// Saves the camera frame and the jewellery as one image
 function captureScreenshot() {
   if (!running || video.readyState < 2) return;
 
@@ -501,7 +493,7 @@ function captureScreenshot() {
     link.download = filename;
     link.rel = 'noopener';
 
-    // iOS Safari has never supported the download attribute.
+    // iOS Safari has never supported the download attribute
     const canDownload = 'download' in link && !isIOS();
     if (!canDownload) link.target = '_blank';
 
@@ -509,7 +501,7 @@ function captureScreenshot() {
     link.click();
     link.remove();
 
-    // Give the browser time to start reading the blob before releasing it.
+    // Give the browser time to start reading the blob before releasing it
     setTimeout(() => URL.revokeObjectURL(url), 60000);
     showNotification(canDownload ? 'Screenshot saved' : 'Photo ready — press and hold to save it');
   };
@@ -528,7 +520,7 @@ function captureScreenshot() {
 
 function isIOS() {
   const ua = navigator.userAgent || '';
-  // iPadOS 13+ reports itself as a Mac, and is told apart by touch support.
+  // iPadOS 13+ reports itself as a Mac, and is told apart by touch support
   return /iPad|iPhone|iPod/.test(ua)
     || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
 }
@@ -541,10 +533,7 @@ async function init() {
   window.addEventListener('orientationchange', () => setTimeout(resizeViewport, 250));
   video.addEventListener('loadedmetadata', resizeViewport);
 
-  // The wrapper is sized by aspect-ratio and a max-width, so it can change
-  // without the window doing so — late webfonts, the mobile URL bar sliding
-  // away, a scrollbar appearing.
-  // mapping is wrong and everything sits slightly off.
+  // The wrapper is sized by aspect-ratio and a max-width
   if (window.ResizeObserver && video.parentElement) {
     new ResizeObserver(() => resizeViewport()).observe(video.parentElement);
   }
@@ -556,7 +545,7 @@ async function init() {
   setTrackingUI('Camera off', 'offline');
   await discoverCatalogue();
   buildJewelleryUI();
-  // Nothing can be tried on until there is a face or a hand to track.
+  // Nothing can be tried on until there is a face or a hand to track
   setJewelleryEnabled(false);
 
   if (new URLSearchParams(location.search).has('tune')) {
