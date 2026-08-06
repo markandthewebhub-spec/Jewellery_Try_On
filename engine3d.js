@@ -80,7 +80,7 @@ const PLACE = {
   // Necklace
   // ►► THE ONE VALUE THAT MOVES THE NECKLACE UP OR DOWN ◄◄
   // How far below the NECK PIVOT the chain crosses the sides of the neck
-  neckDrop: 0.50,
+  neckDrop: 0.35,
 
   // Where the head actually pivots when it nods:
   neckPivotDrop: -0.05,
