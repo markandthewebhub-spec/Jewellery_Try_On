@@ -1,0 +1,39 @@
+{
+  "_comment": [
+    "The jewellery catalogue. This is the ONLY file to edit when adding or",
+    "removing a piece — no JavaScript changes are needed.",
+    "",
+    "To add jewellery:",
+    "  1. Create a folder under objects/ containing model.obj, and optionally",
+    "     model.mtl plus its texture images (.jpg / .png / .webp).",
+    "  2. Add the folder name to the list below.",
+    "",
+    "The short form is just the folder name. The category and the display",
+    "label are worked out from it: 'necklace-gold' becomes a Gold Necklace.",
+    "Dashes, underscores and spaces all work, the category word may lead or",
+    "trail, and plurals are fine — 'Gold_Necklace' and 'earrings-hoop' both",
+    "resolve correctly.",
+    "",
+    "Use the long form when the folder name cannot say it for you:",
+    "  { \"folder\": \"aurora-set-01\", \"category\": \"necklace\", \"label\": \"Aurora\" }",
+    "",
+    "Supported categories: necklace, earring, ring, bracelet.",
+    "A folder listed here with no loadable model shows as unavailable rather",
+    "than disappearing, so a missing upload is visible instead of silent.",
+    "",
+    "If this file is absent the app falls back to a built-in list, so nothing",
+    "breaks — but a plugin installation should always generate it."
+  ],
+  "items": [
+    "necklace-gold",
+    "necklace-diamond",
+    "necklace-mala",
+    "earring-gold",
+    "earring-diamond",
+    "earring-hoop",
+    "ring-band",
+    "ring-solitaire",
+    "bracelet-gold",
+    "bracelet-diamond"
+  ]
+}

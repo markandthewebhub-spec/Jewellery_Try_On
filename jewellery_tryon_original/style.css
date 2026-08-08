@@ -1,0 +1,422 @@
+/* Jewellery Try On – Black & Gold Theme */
+
+:root {
+  --gold: #D4AF37;
+  --gold-light: #F0D878;
+  --gold-dark: #9A7B2C;
+  --black-deep: #0B0B0B;
+  --black-card: #141414;
+  --black-elevated: #1C1C1C;
+  --text-primary: #F5F0E8;
+  --text-secondary: #A09A90;
+  --text-muted: #6B6560;
+  --border-gold: rgba(212, 175, 55, 0.25);
+  --radius-camera: 20px;
+  --radius-action: 14px;
+  --btn-jewellery-w: 148px;
+  --btn-jewellery-h: 48px;
+  --shadow-gold: 0 0 24px rgba(212, 175, 55, 0.22);
+  --shadow-gold-strong: 0 0 40px rgba(212, 175, 55, 0.35);
+  --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.55);
+  --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --font-display: 'Playfair Display', Georgia, serif;
+  --font-body: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--black-deep);
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--black-deep);
+  color: var(--text-primary);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.9rem 1.25rem;
+  background: var(--black-deep);
+  border-bottom: 2px solid var(--gold-dark);
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.6);
+}
+
+.header-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
+
+.header-subtitle {
+  font-size: 0.78rem;
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.offline { background: #555; }
+.status-dot.loading { background: var(--gold); animation: pulse 1.2s ease infinite; }
+.status-dot.tracking { background: #4ade80; box-shadow: 0 0 8px rgba(74, 222, 128, 0.6); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Main */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.25rem 1rem 2rem;
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Camera Section */
+.camera-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.viewport-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
+  background: var(--black-card);
+  border-radius: var(--radius-camera);
+  border: 1.5px solid var(--gold-dark);
+  box-shadow: var(--shadow-card), var(--shadow-gold);
+  overflow: hidden;
+  animation: fadeIn 0.45s ease 0.05s both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  display: none;
+}
+
+#canvas3d {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  /* NOTE: do NOT mirror this canvas. */
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  background: radial-gradient(ellipse at center, #1a1a1a 0%, var(--black-deep) 100%);
+  z-index: 1;
+  padding: 2rem;
+}
+
+.camera-placeholder.hidden { display: none; }
+
+.placeholder-ring {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-dark);
+  box-shadow: var(--shadow-gold);
+}
+
+.camera-placeholder p {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.camera-placeholder strong {
+  color: var(--gold);
+}
+
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgba(11, 11, 11, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.loading-overlay.hidden { display: none; }
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--gold-dark);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.camera-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.btn-action {
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-action);
+  background: var(--black-elevated);
+  color: var(--gold);
+  border: 1.5px solid var(--gold-dark);
+  letter-spacing: 0.03em;
+}
+
+.btn-action:hover:not(:disabled) {
+  background: var(--gold-dark);
+  color: var(--black-deep);
+  box-shadow: var(--shadow-gold);
+}
+
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Jewellery Section */
+.jewellery-section {
+  animation: fadeIn 0.45s ease 0.15s both;
+}
+
+.jewellery-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.jewellery-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.group-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--gold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--border-gold);
+}
+
+.jewellery-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.jewellery-btn {
+  width: var(--btn-jewellery-w);
+  height: var(--btn-jewellery-h);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius-action);
+  border: 1.5px solid var(--gold-dark);
+  background: var(--black-elevated);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.jewellery-btn:hover:not(:disabled):not(.unavailable) {
+  border-color: var(--gold);
+  color: var(--gold);
+  box-shadow: var(--shadow-gold);
+}
+
+.jewellery-btn.active {
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+  color: var(--black-deep);
+  border-color: var(--gold-light);
+  box-shadow: var(--shadow-gold-strong);
+  font-weight: 600;
+}
+
+.jewellery-btn.loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.jewellery-btn.unavailable,
+.jewellery-btn:disabled {
+  opacity: 0.45;
+  border-style: dashed;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Locked until the camera starts */
+.jewellery-btn.locked {
+  opacity: 0.32;
+  border-style: solid;
+  filter: saturate(0.4);
+  /* Stays clickable on purpose — the handler explains why it is locked. */
+  cursor: pointer;
+}
+
+.jewellery-btn.locked:hover {
+  opacity: 0.45;
+}
+
+/* Briefly draws attention to Start Camera when a locked piece is tapped. */
+.btn-action.nudge {
+  animation: nudge 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes nudge {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-action.nudge { animation: none; }
+}
+
+.jewellery-controls.locked .group-title {
+  opacity: 0.5;
+}
+
+.jewellery-btn.unavailable.active {
+  opacity: 0.45;
+}
+
+.jewellery-btn.placeholder {
+  border-style: dashed;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-gold);
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+  :root {
+    --btn-jewellery-w: 100%;
+  }
+
+  .jewellery-buttons {
+    flex-direction: column;
+  }
+}
+
+/* Toast Notification */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translate(-50%, 16px);
+  z-index: 500;
+  max-width: 90%;
+  padding: 0.8rem 1.3rem;
+  border-radius: var(--radius-action);
+  background: var(--black-elevated);
+  border: 1.5px solid var(--gold-dark);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  box-shadow: var(--shadow-card), var(--shadow-gold);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
