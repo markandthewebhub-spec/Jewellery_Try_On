@@ -204,7 +204,7 @@ export class MediaPipeTracker {
     if (!this.needs.hands) this._clear('hands');
     if (!this.needs.pose) this._clear('pose');
 
-    // Paired bracelets need both wrists; everything else runs cheaper on one
+    // Paired bangles need both wrists; everything else runs cheaper on one
     const want = needs.handCount === 2 ? 2 : 1;
     if (want !== this.handCount) {
       this.handCount = want;
@@ -604,7 +604,7 @@ export function getTrackingLabel(tracking, activeCategories) {
 
   const needs = activeCategories || [];
   const needsFace = needs.some((c) => c === 'necklace' || c === 'earring');
-  const needsHand = needs.some((c) => c === 'ring' || c === 'bracelet');
+  const needsHand = needs.some((c) => c === 'ring' || c === 'bangles');
 
   if (needsFace && tracking.trackingFace) return 'Tracking Face';
   if (needsHand && tracking.trackingHands) return 'Tracking Hand';

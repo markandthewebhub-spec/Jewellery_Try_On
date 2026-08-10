@@ -168,16 +168,19 @@ const PLACE = {
   handCoverFade: 0.35,
 
   // Bangles: outer diameter in wrist widths — the FALLBACK, as for the ring above
-  braceletWidth: 1.32,
+  bangleWidth: 1.32,
   // A bangle is loose:
   bangleHoleFit: 1.08,
   // How much of that slack gravity takes up, pulling it onto the underside
   bangleSag: 0.75,
   // How far up the forearm it sits, in wrist widths
-  braceletSlide: 0.44,
-  braceletDepth: 0.15,
-  braceletMinPx: 20,
-  // Wrist width as a fraction of the KNUCKLE-CENTRE span (landmarks 5 to 17)
+  bangleSlide: 0.44,
+  bangleDepth: 0.15,
+  bangleMinPx: 20,
+
+  // Wrist width as a fraction of the KNUCKLE-CENTRE span (landmarks 5 to 17).
+  // Still the cue the size is calibrated on — see _wristWidth for the two extra
+  // spans that are measured alongside it and what they are for.
   wristFromPalm: 0.86,
   wristDepthRatio: 0.70,
   // How far the forearm mask runs each way from the bangle, in knuckle spans
@@ -194,7 +197,7 @@ const SMOOTH_PROFILE = {
   necklace: { posMin: 0.14, posMax: 0.72, rotMin: 0.10, rotMax: 0.55, scale: 0.14, depth: 0.14 },
   earring: { posMin: 0.20, posMax: 0.86, rotMin: 0.14, rotMax: 0.68, scale: 0.18, depth: 0.18 },
   ring: { posMin: 0.30, posMax: 0.94, rotMin: 0.22, rotMax: 0.85, scale: 0.24, depth: 0.24 },
-  bracelet: { posMin: 0.26, posMax: 0.90, rotMin: 0.18, rotMax: 0.78, scale: 0.20, depth: 0.20 },
+  bangles: { posMin: 0.26, posMax: 0.90, rotMin: 0.18, rotMax: 0.78, scale: 0.20, depth: 0.20 },
   default: { posMin: 0.24, posMax: 0.86, rotMin: 0.18, rotMax: 0.70, scale: 0.20, depth: 0.20 },
 };
 
@@ -242,20 +245,97 @@ function allInFrame(landmarks, indices, margin) {
   return true;
 }
 
-// The four landmarks that make up the ring finger:
-const RING_FINGER_CHAIN = [13, 14, 15, 16];
+// WHICH FINGER WEARS THE RING
+//
+// MediaPipe gives every finger the same four landmarks — MCP (knuckle), PIP
+// (first joint), DIP (second joint), TIP. A ring is worn on the PROXIMAL
+// PHALANX, the bone between MCP and PIP, and that is true of whichever finger
+// the wearer picks, so the whole placement generalises by swapping four indices.
+//
+// `gapRef` is the knuckle the finger's WIDTH is measured against — the next MCP
+// along toward the thumb, because knuckles are packed at roughly one finger
+// width apart. The index finger has nothing on its thumb side in the MCP row, so
+// it borrows the middle finger's. Picking it this way leaves the ring finger's
+// reference at landmark 9, exactly what the ring-only code used before, so the
+// default finger sizes identically to how it always has.
+export const RING_FINGERS = {
+  index: { key: 'index', label: 'Index', ordinal: 1, mcp: 5, pip: 6, dip: 7, tip: 8, gapRef: 9 },
+  middle: { key: 'middle', label: 'Middle', ordinal: 2, mcp: 9, pip: 10, dip: 11, tip: 12, gapRef: 5 },
+  ring: { key: 'ring', label: 'Ring', ordinal: 3, mcp: 13, pip: 14, dip: 15, tip: 16, gapRef: 9 },
+  little: { key: 'little', label: 'Little', ordinal: 4, mcp: 17, pip: 18, dip: 19, tip: 20, gapRef: 13 },
+};
+
+// Left to right across the hand — the order the picker draws them in
+export const RING_FINGER_ORDER = ['index', 'middle', 'ring', 'little'];
+
+// The third finger counting from the index. Where a ring belongs, and what every
+// camera restart returns to.
+export const DEFAULT_RING_FINGER = 'ring';
+
+// Which of the three MCP-row gaps belongs to each finger. The other two are
+// averaged into a second, independent width cue.
+const MCP_GAPS = [[5, 9], [9, 13], [13, 17]];
+const MCP_GAP_OF = { index: 0, middle: 0, ring: 1, little: 2 };
+
+export function normaliseFingerKey(key) {
+  if (!key) return null;
+  const v = String(key).toLowerCase().trim();
+  if (RING_FINGERS[v]) return v;
+  // The names people actually use for them
+  if (v === 'first' || v === 'pointer' || v === 'forefinger' || v === '1') return 'index';
+  if (v === 'second' || v === '2') return 'middle';
+  if (v === 'third' || v === '3' || v === 'ringfinger') return 'ring';
+  if (v === 'fourth' || v === '4' || v === 'pinky' || v === 'pinkie' || v === 'small') return 'little';
+  return null;
+}
+
+export function fingerChain(finger) {
+  return [finger.mcp, finger.pip, finger.dip, finger.tip];
+}
 
 // The knuckles the ring's size and orientation are measured from
 const RING_SUPPORT = [0, 5, 9, 13, 17];
 
-// The ring finger must be fully inside the picture, with no margin at all
-const RING_FRAME_MARGIN = 0;
+// The chosen finger must sit fully inside the picture, and then a little further
+// in still. A landmark exactly on the edge means the finger's SILHOUETTE is
+// already cut, and half a ring hanging off the frame edge looks worse than none.
+const RING_FRAME_INSET = -0.015;
 
-// How much better the other hand's ring finger must look before the ring moves to it
+// How much better the other hand's chosen finger must look before the ring moves to it
 const RING_HAND_STICK = 1.3;
 
 // Proximal phalanx length as a multiple of finger width, on a real hand
 const RING_BONE_TO_WIDTH = 1.85;
+
+// STRICT VISIBILITY
+//
+// MediaPipe Hands reports no per-landmark confidence — unlike Pose, there is no
+// `visibility` field to read, and it will happily invent a plausible position
+// for a finger it cannot see at all. So "is this finger really visible?" has to
+// be answered from the geometry it returns, by three independent signals:
+// shape (below), clearance (is something in front of it), and wobble (are its
+// own proportions holding still). All three have to agree.
+
+// How close another finger may pass in front, as a fraction of the chosen
+// finger's width, before the ring is treated as hidden behind it
+const FINGER_OCCLUDE_REACH = 1.05;
+const FINGER_OCCLUDE_FADE = 0.55;
+// Depth separation that counts as genuinely in front rather than landmark noise
+const FINGER_OCCLUDE_DEPTH = 0.12;
+
+// Frame-to-frame wobble in the finger's OWN proportions. Moving a hand around
+// does not change them, which is what makes this a usable tell: it separates
+// MediaPipe guessing at a finger it cannot see from the hand simply moving fast.
+const FINGER_WOBBLE_LIMIT = 0.16;
+const FINGER_WOBBLE_SMOOTH = 0.20;
+
+// The chosen finger has to look right for this many consecutive frames before
+// the ring appears, and wrong for this many before it leaves. Two different
+// levels, because a single threshold makes the ring strobe when it sits on it.
+const RING_SHOW_LEVEL = 0.58;
+const RING_HIDE_LEVEL = 0.34;
+const RING_SHOW_FRAMES = 4;
+const RING_HIDE_FRAMES = 3;
 
 // Finger and wrist thickness change only as the limb nears the lens
 const LIMB_WIDTH_SMOOTH = 0.12;
@@ -267,16 +347,18 @@ const MIN_PALM_AGREEMENT = 0.25;
 const FOREARM_MATCH_RADIUS = 0.14;
 const FOREARM_MIN_VISIBILITY = 0.5;
 
-// Is there really a ring finger here, laid out plainly enough to place a ring on it? A…
-function ringFingerQuality(hand, engine) {
-  const mcp = hand[13];
-  const pip = hand[14];
-  const dip = hand[15];
-  const tip = hand[16];
-  const middleMcp = hand[9];
-  if (!mcp || !pip || !dip || !tip || !middleMcp) return 0;
+// Is there really a finger here, laid out plainly enough to place a ring on it?
+// Unchanged in substance from the ring-finger-only version — it just reads its
+// four landmarks out of `finger` instead of having 13/14/15/16 written into it.
+function fingerQuality(hand, engine, finger) {
+  const mcp = hand[finger.mcp];
+  const pip = hand[finger.pip];
+  const dip = hand[finger.dip];
+  const tip = hand[finger.tip];
+  const gapRef = hand[finger.gapRef];
+  if (!mcp || !pip || !dip || !tip || !gapRef) return 0;
 
-  const knuckleGap = engine.dist3D(middleMcp, mcp);
+  const knuckleGap = engine.dist3D(gapRef, mcp);
   if (!(knuckleGap > 1e-4)) return 0;
 
   const proximal = engine.dist3D(mcp, pip);
@@ -302,8 +384,105 @@ function ringFingerQuality(hand, engine) {
   return Math.min(lengthScore, straightScore);
 }
 
-// Wrist plus the two knuckles the bracelet's width and orientation are measured from
-const WRIST_CHAIN = [0, 5, 17];
+// Proximal phalanx as a multiple of the knuckle gap. A real finger holds this
+// almost constant no matter where the hand goes, so a value that will not sit
+// still is the signature of a landmark being guessed rather than seen.
+function fingerShapeRatio(hand, engine, finger) {
+  const mcp = hand[finger.mcp];
+  const pip = hand[finger.pip];
+  const gapRef = hand[finger.gapRef];
+  if (!mcp || !pip || !gapRef) return 0;
+  const gap = engine.dist3D(gapRef, mcp);
+  return gap > 1e-4 ? engine.dist3D(mcp, pip) / gap : 0;
+}
+
+// How near a tap has to land, as a fraction of the hand's own knuckle span,
+// before it counts as having chosen that finger
+const FINGER_TAP_REACH = 0.75;
+
+// Scratch for the finger-clearance solve
+const _fsA = new THREE.Vector3();
+const _fsB = new THREE.Vector3();
+const _fsSeg = new THREE.Vector3();
+const _fsRel = new THREE.Vector3();
+const _fsNear = new THREE.Vector3();
+
+// Scratch for the tap hit-test
+const _ftA = new THREE.Vector3();
+const _ftB = new THREE.Vector3();
+
+// Distance from a point to a line segment, in the screen plane only — depth is
+// irrelevant to where a finger LOOKS like it is when someone taps it.
+function distanceToSegment2D(x, y, a, b) {
+  const abx = b.x - a.x;
+  const aby = b.y - a.y;
+  const len2 = abx * abx + aby * aby;
+  let t = 0;
+  if (len2 > 1e-9) {
+    t = ((x - a.x) * abx + (y - a.y) * aby) / len2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+  }
+  return Math.hypot(x - (a.x + abx * t), y - (a.y + aby * t));
+}
+
+// Is anything in front of the seat point? 1 = nothing, 0 = fully covered.
+// Only the OTHER fingers' proximal bones are tested: they are what a hand
+// actually covers a ring with, and a closed fist puts all three across it.
+function fingerClearance(hand, engine, finger, seat, fingerWidth) {
+  if (!(fingerWidth > 1e-4)) return 0;
+
+  let worst = 1;
+  for (const key of RING_FINGER_ORDER) {
+    const other = RING_FINGERS[key];
+    if (other.key === finger.key) continue;
+
+    const a = hand[other.mcp];
+    const b = hand[other.pip];
+    if (!a || !b) continue;
+
+    engine.lmToScreen(a, _fsA);
+    engine.lmToScreen(b, _fsB);
+
+    // Closest point on that bone to the seat, clamped to the segment
+    _fsSeg.subVectors(_fsB, _fsA);
+    const len2 = _fsSeg.lengthSq();
+    let t = 0;
+    if (len2 > 1e-9) {
+      _fsRel.subVectors(seat, _fsA);
+      t = _fsRel.dot(_fsSeg) / len2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+    }
+    _fsNear.copy(_fsA).addScaledVector(_fsSeg, t);
+
+    // Behind the chosen finger, or level with it? Then it hides nothing.
+    // Screen space runs +Z toward the lens, so nearer means larger.
+    if (_fsNear.z - seat.z <= fingerWidth * FINGER_OCCLUDE_DEPTH) continue;
+
+    const gap = Math.hypot(_fsNear.x - seat.x, _fsNear.y - seat.y);
+    const reach = fingerWidth * FINGER_OCCLUDE_REACH;
+    const fade = Math.max(fingerWidth * FINGER_OCCLUDE_FADE, 1e-3);
+    const clear = 1 - clamp01((reach - gap) / fade);
+    if (clear < worst) worst = clear;
+  }
+  return worst;
+}
+
+// Wrist plus the knuckles a bangle's width and orientation are measured from.
+// Landmark 1 (thumb CMC) is in here because it and 17 straddle the base of the
+// palm, which is the part of the hand that actually turns with the wrist.
+const WRIST_CHAIN = [0, 1, 5, 17];
+
+// A bangle's size is read from three spans across the hand at once. They run
+// along different axes, so they foreshorten at different moments — which is the
+// whole point, since the median of them barely moves as the wrist turns, where
+// any one of them alone swings badly.
+//
+// They are different LENGTHS on a real hand though, so they cannot be compared
+// until the engine has watched the same hand square-on and learned how they
+// relate. Until it has, only the calibrated cue is used, which is exactly the
+// measurement bangles have always been sized by.
+const WRIST_CAL_SQUARENESS = 0.80;
+const WRIST_CAL_SMOOTH = 0.05;
 
 // The points compared when deciding whether two hand slots hold one hand
 const SAME_HAND_POINTS = [0, 5, 9, 13, 17];
@@ -328,6 +507,12 @@ function responsive(min, max, speed, reference, dtScale) {
   const t = clamp01(speed / Math.max(reference, 1e-6));
   return adapt(min + (max - min) * t, dtScale);
 }
+
+// Where the jewellery folders live; a host page sets window.VTO_OBJECTS_URL
+export const OBJECTS_BASE = (() => {
+  const set = typeof window !== 'undefined' && window.VTO_OBJECTS_URL;
+  return set ? String(set).replace(/\/*$/, '/') : 'objects/';
+})();
 
 // PER-FOLDER TUNING
 
@@ -376,7 +561,7 @@ const CATEGORY_DEFAULTS = {
   // Earrings hang from the hook, which is the pivot the model gets
   earring: { fitAxis: 'y', anchor: 'top', scale: 1, pair: 2, pairMirror: false },
   ring: { fitAxis: 'x', anchor: 'center', scale: 1, pair: 1, pairMirror: false },
-  bracelet: { fitAxis: 'x', anchor: 'center', scale: 1, pair: 2, pairMirror: false },
+  bangles: { fitAxis: 'x', anchor: 'center', scale: 1, pair: 2, pairMirror: false },
 };
 
 const FADE_SPEED = 0.18;
@@ -419,6 +604,19 @@ const _handFrameOut = { normal: _hfNormal, across: _hfAcross, along: _hfAlong };
 // Scratch for the forearm solve
 const _faElbow = new THREE.Vector3();
 const _faWrist = new THREE.Vector3();
+
+// Scratch for the wrist-frame solve
+const _wfWrist = new THREE.Vector3();
+const _wfThumb = new THREE.Vector3();
+const _wfIndex = new THREE.Vector3();
+const _wfPinky = new THREE.Vector3();
+const _wfBase = new THREE.Vector3();
+const _wfAcross = new THREE.Vector3();
+const _wfAlong = new THREE.Vector3();
+const _wfNormal = new THREE.Vector3();
+
+// Returned by _wristFrame — the same object every call, never retained by a caller
+const _wristFrameOut = { across: _wfAcross, along: _wfAlong, normal: _wfNormal };
 
 // Scratch for the hand-occlusion test
 const _hcWrist = new THREE.Vector3();
@@ -588,6 +786,16 @@ export class Engine3D {
     // Detector results the face has been missing for, refreshed each frame
     this._faceMiss = 0;
     this._tracking = null;
+
+    // Which finger the ring is worn on. Deliberately engine state rather than
+    // per-item state: swapping to a different ring keeps the chosen finger,
+    // and only a camera restart puts it back (see resetRingFinger).
+    this.ringFinger = DEFAULT_RING_FINGER;
+
+    // Per-finger confidence from the last solved frame, so the UI can show which
+    // fingers are actually trackable instead of leaving the wearer guessing why
+    // nothing appeared. Keyed by finger, values 0..1.
+    this.fingerConfidence = {};
 
     // Open the page with ?anchors=1 to draw a dot at every attachment point
     this.showAnchors = typeof location !== 'undefined'
@@ -1029,7 +1237,7 @@ export class Engine3D {
   }
 
   async _loadTemplate(folder, objFile, category, cacheKey, onProgress) {
-    const basePath = `objects/${folder}/`;
+    const basePath = `${OBJECTS_BASE}${folder}/`;
 
     // Fetch the OBJ once, with progress
     const raw = await fetchTextWithProgress(`${basePath}${objFile}`, onProgress);
@@ -1129,7 +1337,7 @@ export class Engine3D {
   activate(id, template) {
     if (this.activeItems.has(id)) return;
 
-    // Earrings and bracelets are worn as a pair, so one uploaded model gets duplicated:
+    // Earrings and bangles are worn as a pair, so one uploaded model gets duplicated:
     const count = template.tuning.pair === 2 ? 2 : 1;
     const instances = [];
 
@@ -1222,7 +1430,18 @@ export class Engine3D {
 
     this._lastFrameTime = 0;
 
+    // Nothing learned from the last session survives either: a ring must earn
+    // its way past the visibility gate again rather than reappearing the instant
+    // the camera comes back, and limb widths belong to whoever was in frame.
+    this.fingerConfidence = {};
     for (const [, entry] of this.activeItems) {
+      entry.ringGate = null;
+      entry.fingerShape = null;
+      entry.fingerWidth = 0;
+      entry.ringSlot = undefined;
+      entry.wristWidthA = 0;
+      entry.wristWidthB = 0;
+
       for (const inst of entry.instances) {
         inst.group.visible = false;
         inst.state.initialized = false;
@@ -1654,8 +1873,96 @@ export class Engine3D {
     return _handFrameOut;
   }
 
-  // Which tracked hand is wearing the ring? Whichever shows the better ring finger
-  _pickRingHand(entry, tracking) {
+  // FINGER SELECTION
+
+  /** Which finger the ring is worn on, as a key of RING_FINGERS. */
+  getRingFinger() {
+    return this.ringFinger;
+  }
+
+  /**
+   * Move the ring to another finger. Returns the finger actually in use, so a
+   * caller that passes something unrecognised gets the unchanged one back.
+   */
+  setRingFinger(key) {
+    const next = normaliseFingerKey(key);
+    if (!next || next === this.ringFinger) return this.ringFinger;
+    this.ringFinger = next;
+    this._forgetRingFingerState();
+    return this.ringFinger;
+  }
+
+  /** Back to the third finger. Called when the camera restarts. */
+  resetRingFinger() {
+    this.ringFinger = DEFAULT_RING_FINGER;
+    this._forgetRingFingerState();
+    return this.ringFinger;
+  }
+
+  // Everything remembered about the finger being left behind. Without this the
+  // ring would arrive on the new finger already past its visibility gate, at the
+  // old finger's width, still holding the old hand's roll.
+  _forgetRingFingerState() {
+    this.fingerConfidence = {};
+    for (const [, entry] of this.activeItems) {
+      if (entry.category !== 'ring') continue;
+      entry.ringGate = null;
+      entry.fingerShape = null;
+      entry.fingerWidth = 0;
+      entry.ringSlot = undefined;
+      entry.dorsalSide = undefined;
+    }
+  }
+
+  /**
+   * Which finger is under this point? Coordinates are engine screen space —
+   * centred on the canvas, +Y up — the same space lmToScreen produces.
+   * Returns null when the tap was not near any finger, so a stray tap on the
+   * background does not snap the ring to whichever finger was least far away.
+   */
+  pickFingerAt(x, y) {
+    const tracking = this._tracking;
+    if (!tracking) return null;
+
+    let best = null;
+    for (const hand of [tracking.leftHand, tracking.rightHand]) {
+      if (!hand || hand.length < 21) continue;
+
+      // Tap tolerance scales with how big the hand is on screen, so it works the
+      // same at arm's length as it does close up
+      const span = this.dist2D(hand[HAND.indexMcp], hand[HAND.pinkyMcp]);
+      if (!(span > 1e-3)) continue;
+      const limit = span * FINGER_TAP_REACH;
+
+      for (const key of RING_FINGER_ORDER) {
+        const d = this._tapDistanceToFinger(hand, RING_FINGERS[key], x, y);
+        if (d === null || d > limit) continue;
+        if (!best || d < best.d) best = { key, d };
+      }
+    }
+    return best ? best.key : null;
+  }
+
+  // Shortest distance in the screen plane from a point to a finger's skeleton,
+  // treated as the three joined bones MCP→PIP→DIP→TIP. People tap the part of
+  // the finger they can see, which is rarely the knuckle.
+  _tapDistanceToFinger(hand, finger, x, y) {
+    const chain = fingerChain(finger);
+    let best = null;
+    for (let i = 0; i < chain.length - 1; i++) {
+      const a = hand[chain[i]];
+      const b = hand[chain[i + 1]];
+      if (!a || !b) continue;
+      this.lmToScreen(a, _ftA);
+      this.lmToScreen(b, _ftB);
+      const d = distanceToSegment2D(x, y, _ftA, _ftB);
+      if (best === null || d < best) best = d;
+    }
+    return best;
+  }
+
+  // Which tracked hand is wearing the ring? Whichever shows the chosen finger best
+  _pickRingHand(entry, tracking, finger) {
     const options = [
       { hand: tracking.leftHand, miss: tracking.leftHandMiss, isRight: tracking.leftHandIsRight, slot: 0 },
       { hand: tracking.rightHand, miss: tracking.rightHandMiss, isRight: tracking.rightHandIsRight, slot: 1 },
@@ -1666,11 +1973,12 @@ export class Engine3D {
       const hand = option.hand;
       if (!hand || hand.length < 21) continue;
 
-      // Every landmark the placement reads must be genuinely in shot
-      if (!allInFrame(hand, RING_FINGER_CHAIN, RING_FRAME_MARGIN)) continue;
+      // Every landmark the placement reads must be genuinely in shot, and the
+      // chosen finger has to clear the frame edge rather than merely touch it
+      if (!allInFrame(hand, fingerChain(finger), RING_FRAME_INSET)) continue;
       if (!allInFrame(hand, RING_SUPPORT)) continue;
 
-      const quality = ringFingerQuality(hand, this) * freshness(option.miss);
+      const quality = fingerQuality(hand, this, finger) * freshness(option.miss);
       if (quality <= 0.01) continue;
 
       const weighted = option.slot === entry.ringSlot ? quality * RING_HAND_STICK : quality;
@@ -1682,11 +1990,15 @@ export class Engine3D {
   }
 
   // Finger thickness, from three independent cues rather than one gap
-  _ringFingerWidth(entry, hand) {
+  _ringFingerWidth(entry, hand, finger) {
+    const gaps = MCP_GAPS.map(([a, b]) => this.dist3D(hand[a], hand[b]));
+    const own = MCP_GAP_OF[finger.key] ?? 1;
+    const others = gaps.filter((v, i) => i !== own && v > 1e-4);
+
     const cues = [
-      this.dist3D(hand[9], hand[13]),                        // the ring finger's own knuckle gap
-      (this.dist3D(hand[5], hand[9]) + this.dist3D(hand[13], hand[17])) * 0.5,
-      this.dist3D(hand[13], hand[14]) / RING_BONE_TO_WIDTH,  // its proximal bone
+      gaps[own],                                                     // its own knuckle gap
+      others.length ? others.reduce((sum, v) => sum + v, 0) / others.length : 0,
+      this.dist3D(hand[finger.mcp], hand[finger.pip]) / RING_BONE_TO_WIDTH,  // its proximal bone
     ].filter((v) => v > 1e-4).sort((a, b) => a - b);
 
     if (!cues.length) return 0;
@@ -1701,35 +2013,109 @@ export class Engine3D {
     return entry.fingerWidth;
   }
 
-  // The ring is worn on one bone, so everything here is solved in the hand's own frame
+  // Are the chosen finger's own proportions holding still? See FINGER_WOBBLE_LIMIT
+  _fingerSteadiness(entry, hand, finger) {
+    const ratio = fingerShapeRatio(hand, this, finger);
+    if (!(ratio > 1e-4)) return 0;
+
+    const st = entry.fingerShape;
+    if (!st || st.key !== finger.key) {
+      entry.fingerShape = { key: finger.key, ratio, wobble: 0 };
+      // Nothing to compare against yet. The gate's frame count is what stops a
+      // single lucky frame from being enough.
+      return 1;
+    }
+
+    // Per-60fps-frame, so a slow frame is not mistaken for a jumpy landmark
+    const change = Math.abs(ratio - st.ratio) / Math.max(this._dtScale, 1e-3);
+    st.ratio = ratio;
+    st.wobble += (change - st.wobble) * adapt(FINGER_WOBBLE_SMOOTH, this._dtScale);
+    return clamp01(1 - st.wobble / FINGER_WOBBLE_LIMIT);
+  }
+
+  // Two thresholds and two frame counts, so the ring cannot strobe on the edge
+  // of its own visibility test. Better to hide it than to show it wrong.
+  _ringGate(entry, confidence) {
+    let gate = entry.ringGate;
+    if (!gate) {
+      gate = entry.ringGate = { on: false, good: 0, bad: 0 };
+    }
+
+    if (gate.on) {
+      if (confidence >= RING_HIDE_LEVEL) gate.bad = 0;
+      else if (++gate.bad >= RING_HIDE_FRAMES) { gate.on = false; gate.good = 0; }
+    } else if (confidence >= RING_SHOW_LEVEL) {
+      if (++gate.good >= RING_SHOW_FRAMES) { gate.on = true; gate.bad = 0; }
+    } else {
+      gate.good = 0;
+    }
+    return gate.on;
+  }
+
+  // What the picker's per-finger indicators read. Cheap signals only — the full
+  // test is run for the chosen finger alone, in updateRing.
+  _reportFingerConfidence(tracking, chosenKey, chosenValue) {
+    const out = {};
+    for (const key of RING_FINGER_ORDER) {
+      const finger = RING_FINGERS[key];
+      let best = 0;
+      for (const hand of [tracking.leftHand, tracking.rightHand]) {
+        if (!hand || hand.length < 21) continue;
+        if (!allInFrame(hand, fingerChain(finger), RING_FRAME_INSET)) continue;
+        if (!allInFrame(hand, RING_SUPPORT)) continue;
+        const q = fingerQuality(hand, this, finger);
+        if (q > best) best = q;
+      }
+      out[key] = best;
+    }
+    if (chosenKey) out[chosenKey] = chosenValue;
+    this.fingerConfidence = out;
+  }
+
+  // The ring is worn on one bone, so everything here is solved in the hand's own
+  // frame. Which bone is whichever finger the wearer picked — see RING_FINGERS.
   updateRing(entry, tracking) {
-    const pick = this._pickRingHand(entry, tracking);
-    if (!pick) return false;
+    const finger = RING_FINGERS[this.ringFinger] || RING_FINGERS[DEFAULT_RING_FINGER];
+
+    const pick = this._pickRingHand(entry, tracking, finger);
+    if (!pick) {
+      this._ringGate(entry, 0);
+      this._reportFingerConfidence(tracking, finger.key, 0);
+      return false;
+    }
 
     const hand = pick.hand;
     const frame = this._handFrame(hand);
-    if (!frame) return false;
+    if (!frame) {
+      this._ringGate(entry, 0);
+      this._reportFingerConfidence(tracking, finger.key, 0);
+      return false;
+    }
 
-    // Moving to the other hand invalidates both remembered values:
+    // Moving to the other hand invalidates everything remembered about the last:
     if (entry.ringSlot !== pick.slot) {
       entry.fingerWidth = 0;
       entry.dorsalSide = undefined;
+      entry.fingerShape = null;
       entry.ringSlot = pick.slot;
     }
 
-    this.lmToScreen(hand[HAND.ringMcp], _v1);
-    this.lmToScreen(hand[HAND.ringPip], _v2);
+    this.lmToScreen(hand[finger.mcp], _v1);
+    this.lmToScreen(hand[finger.pip], _v2);
 
     // Finger axis
     const axis = _v5.subVectors(_v2, _v1);
     const axisLen = axis.length();
-    if (axisLen < 1e-6) return false;
+    if (axisLen < 1e-6) {
+      this._ringGate(entry, 0);
+      this._reportFingerConfidence(tracking, finger.key, 0);
+      return false;
+    }
     axis.multiplyScalar(1 / axisLen);
 
     // A finger pointing straight at the lens collapses to a dot in the image
     const inPlane = Math.hypot(axis.x, axis.y);
     const axisScore = clamp01((inPlane - PLACE.ringMinAxisView) / PLACE.ringAxisBand);
-    if (axisScore <= 0.01) return false;
 
     // Which way is the back of the hand? From finger curl
     _n2.copy(frame.normal);
@@ -1743,8 +2129,12 @@ export class Engine3D {
     if (_n3.z < 0) _n3.negate();
 
     // Scale: fitted by the model's HOLE, so the finger fills it exactly
-    const fingerWidth = this._ringFingerWidth(entry, hand);
-    if (!(fingerWidth > 1e-4)) return false;
+    const fingerWidth = this._ringFingerWidth(entry, hand, finger);
+    if (!(fingerWidth > 1e-4)) {
+      this._ringGate(entry, 0);
+      this._reportFingerConfidence(tracking, finger.key, 0);
+      return false;
+    }
     const fingerRadius = fingerWidth * 0.5;
 
     const inner = entry.analysis?.innerRadius || 0;
@@ -1763,15 +2153,36 @@ export class Engine3D {
     // Orientation
     basisQuat(axis, _n2, _q1);
 
-    // The hand has left the picture — see _outOfFrame
-    if (this._outOfFrame(_pos, scale)) return false;
+    // IS THIS FINGER REALLY VISIBLE?
+    //
+    // Five independent signals, multiplied, so any one of them failing on its
+    // own is enough to take the ring away:
+    //   shape      — is it extended and proportioned like a real finger
+    //   axis       — is it lying across the image rather than pointing at us
+    //   clearance  — is another finger folded in front of it
+    //   steadiness — are its landmarks observations or guesses
+    //   coverage   — is the other hand over the top of it
+    // Then the gate turns that number into a stable yes or no.
+    const clearance = fingerClearance(hand, this, finger, _pos, fingerWidth);
+    const steadiness = this._fingerSteadiness(entry, hand, finger);
+    const covered = this._handCoverage(_pos, tracking, hand);
+
+    const confidence = this._outOfFrame(_pos, scale)
+      ? 0
+      : pick.quality * axisScore * clearance * steadiness * (1 - covered);
+
+    this._reportFingerConfidence(tracking, finger.key, confidence);
+
+    if (!this._ringGate(entry, confidence)) return false;
 
     this._markAnchor('ring', _pos, 0xff44aa);
 
-    // The OTHER hand covering this one hides the ring
-    const alpha = pick.quality
-      * axisScore
-      * (1 - this._handCoverage(_pos, tracking, hand));
+    // Full opacity as soon as the finger is comfortably visible, fading out only
+    // across the gate's own hysteresis band — a ring rendered at 60% because its
+    // confidence happened to be 0.6 just looks like a rendering fault.
+    const alpha = clamp01(
+      (confidence - RING_HIDE_LEVEL) / Math.max(RING_SHOW_LEVEL - RING_HIDE_LEVEL, 1e-6),
+    );
     if (alpha <= 0.01) return false;
 
     const inst = entry.instances[0];
@@ -1820,8 +2231,8 @@ export class Engine3D {
     return sum / SAME_HAND_POINTS.length < span * SAME_HAND_LIMIT;
   }
 
-  // A bracelet is worn as a pair, so instance 0 follows one hand and instance 1 the other
-  updateBracelet(entry, tracking) {
+  // Bangles are worn as a pair, so instance 0 follows one hand and instance 1 the other
+  updateBangles(entry, tracking) {
     const hands = [tracking.leftHand, tracking.rightHand];
     const sides = [tracking.leftHandIsRight, tracking.rightHandIsRight];
     const misses = [tracking.leftHandMiss, tracking.rightHandMiss];
@@ -1845,8 +2256,9 @@ export class Engine3D {
         this._forgetMask(`forearm${i}`);
         continue;
       }
-      this._placeBracelet(entry, entry.instances[i], hand, i, sides[i], alpha, tracking);
-      placed++;
+      if (this._placeBangle(entry, entry.instances[i], hand, i, sides[i], alpha, tracking)) {
+        placed++;
+      }
     }
 
     // Single-instance fallback:
@@ -1855,12 +2267,102 @@ export class Engine3D {
       if (!hand || hand.length < 21 || !allInFrame(hand, WRIST_CHAIN)) return false;
       const alpha = freshness(tracking.primaryHandMiss);
       if (alpha <= 0.01) return false;
-      this._placeBracelet(
+      if (this._placeBangle(
         entry, entry.instances[0], hand, 0, tracking.primaryHandIsRight, alpha, tracking,
-      );
-      placed++;
+      )) {
+        placed++;
+      }
     }
     return placed > 0;
+  }
+
+  /**
+   * The WRIST's own frame, fitted to the base of the palm instead of to the
+   * knuckle fan.
+   *
+   * _handFrame is built from the four MCPs, which is the right bone for a ring
+   * — the ring sits among them. It is the wrong one for a bangle:
+   *
+   *   · its `across` axis runs 5→17, so splaying the fingers turns it, and the
+   *     bangle rolls on a wrist that never moved;
+   *   · it needs the knuckle triangles to agree (MIN_PALM_AGREEMENT), and they
+   *     stop agreeing the moment the hand closes — so a fist used to make the
+   *     bangle vanish outright;
+   *   · nothing in it is anchored to the carpus, which is the part of the hand
+   *     that actually rotates with the forearm.
+   *
+   * This one runs `across` from the thumb's CMC (1) to the little finger's MCP
+   * (17). Both are carried on the palm's base, so the axis turns with the wrist
+   * and holds through a fist. `along` keeps a long baseline for steadiness, from
+   * the wrist to the midpoint of the knuckle row.
+   */
+  _wristFrame(hand) {
+    const wrist = hand[HAND.wrist];
+    const thumb = hand[HAND.thumbCmc];
+    const index = hand[HAND.indexMcp];
+    const pinky = hand[HAND.pinkyMcp];
+    if (!wrist || !thumb || !index || !pinky) return null;
+
+    this.lmToScreen(wrist, _wfWrist);
+    this.lmToScreen(thumb, _wfThumb);
+    this.lmToScreen(index, _wfIndex);
+    this.lmToScreen(pinky, _wfPinky);
+
+    // Wrist → hand. Two landmarks averaged, and a long way from the wrist, so
+    // the direction is far steadier than either knuckle would give on its own.
+    _wfBase.addVectors(_wfIndex, _wfPinky).multiplyScalar(0.5);
+    _wfAlong.subVectors(_wfBase, _wfWrist);
+    if (_wfAlong.lengthSq() < 1e-9) return null;
+    _wfAlong.normalize();
+
+    // Across the base of the palm, then squared to the axis above
+    _wfAcross.subVectors(_wfPinky, _wfThumb);
+    _wfAcross.addScaledVector(_wfAlong, -_wfAlong.dot(_wfAcross));
+    if (_wfAcross.lengthSq() < 1e-9) return null;
+    _wfAcross.normalize();
+
+    _wfNormal.crossVectors(_wfAcross, _wfAlong);
+    if (_wfNormal.lengthSq() < 1e-9) return null;
+    _wfNormal.normalize();
+
+    return _wristFrameOut;
+  }
+
+  // Wrist thickness. See WRIST_CAL_SQUARENESS for why the extra spans have to be
+  // calibrated before they can be believed.
+  _wristWidth(entry, hand, slot, frame) {
+    const primary = this.dist3D(hand[HAND.indexMcp], hand[HAND.pinkyMcp]);
+    if (!(primary > 1e-4)) return 0;
+
+    const base = this.dist3D(hand[HAND.thumbCmc], hand[HAND.pinkyMcp]);
+    const length = this.dist3D(hand[HAND.wrist], hand[HAND.middleMcp]);
+
+    const calKey = slot === 1 ? 'wristCalB' : 'wristCalA';
+    const cal = entry[calKey] || (entry[calKey] = { base: 0, length: 0 });
+
+    // Palm square to the lens means nothing is foreshortened, so all three spans
+    // are measuring what they claim to and it is safe to learn how they relate.
+    if (Math.abs(frame.normal.z) > WRIST_CAL_SQUARENESS && base > 1e-4 && length > 1e-4) {
+      const k = adapt(WRIST_CAL_SMOOTH, this._dtScale);
+      const toBase = primary / base;
+      const toLength = primary / length;
+      cal.base = cal.base > 0 ? cal.base + (toBase - cal.base) * k : toBase;
+      cal.length = cal.length > 0 ? cal.length + (toLength - cal.length) * k : toLength;
+    }
+
+    const cues = [primary];
+    if (cal.base > 0 && base > 1e-4) cues.push(base * cal.base);
+    if (cal.length > 0 && length > 1e-4) cues.push(length * cal.length);
+    cues.sort((a, b) => a - b);
+
+    const target = cues[Math.floor(cues.length / 2)] * PLACE.wristFromPalm;
+
+    const widthKey = slot === 1 ? 'wristWidthB' : 'wristWidthA';
+    const prev = entry[widthKey] || 0;
+    entry[widthKey] = prev > 0
+      ? prev + (target - prev) * adapt(LIMB_WIDTH_SMOOTH, this._dtScale)
+      : target;
+    return entry[widthKey];
   }
 
   // Elbow → wrist, from Pose, for whichever arm this hand belongs to
@@ -1896,11 +2398,18 @@ export class Engine3D {
       * clamp01(1 - bestDist / FOREARM_MATCH_RADIUS);
   }
 
-  // A bangle hangs loose on the forearm, so it is solved on the forearm's frame
-  _placeBracelet(entry, inst, hand, slot, isRight, alpha = 1, tracking = null) {
+  // A bangle hangs loose on the forearm, so it is solved on the forearm's frame.
+  // Returns whether it managed to place anything.
+  _placeBangle(entry, inst, hand, slot, isRight, alpha = 1, tracking = null) {
     const index = slot === 1 ? 1 : 0;
-    const frame = this._handFrame(hand);
-    if (!frame) return;
+
+    // The wrist's own frame, NOT the knuckle fan — see _wristFrame
+    const frame = this._wristFrame(hand);
+    if (!frame) {
+      this.place(inst, _pos, 1, _q1.identity(), false);
+      this._forgetMask(`forearm${index}`);
+      return false;
+    }
 
     this.lmToScreen(hand[HAND.wrist], _v1);
 
@@ -1923,7 +2432,11 @@ export class Engine3D {
 
     // Made square to the forearm axis actually in use, not to the palm's
     _n2.addScaledVector(_n1, -_n1.dot(_n2));
-    if (_n2.lengthSq() < 1e-9) return;
+    if (_n2.lengthSq() < 1e-9) {
+      this.place(inst, _pos, 1, _q1.identity(), false);
+      this._forgetMask(`forearm${index}`);
+      return false;
+    }
     _n2.normalize();
 
     // A second copy forced toward the lens — seat correction only, never orientation
@@ -1932,15 +2445,18 @@ export class Engine3D {
 
     // Scale
     const palmWidth = this.dist3D(hand[HAND.indexMcp], hand[HAND.pinkyMcp]);
-    if (!(palmWidth > 1e-4)) return;
+    if (!(palmWidth > 1e-4)) {
+      this.place(inst, _pos, 1, _q1.identity(), false);
+      this._forgetMask(`forearm${index}`);
+      return false;
+    }
 
-    const widthKey = slot === 1 ? 'wristWidthB' : 'wristWidthA';
-    const target = palmWidth * PLACE.wristFromPalm;
-    const prev = entry[widthKey] || 0;
-    const wristWidth = prev > 0
-      ? prev + (target - prev) * adapt(LIMB_WIDTH_SMOOTH, this._dtScale)
-      : target;
-    entry[widthKey] = wristWidth;
+    const wristWidth = this._wristWidth(entry, hand, slot, frame);
+    if (!(wristWidth > 1e-4)) {
+      this.place(inst, _pos, 1, _q1.identity(), false);
+      this._forgetMask(`forearm${index}`);
+      return false;
+    }
     const wristRadius = wristWidth * 0.5;
 
     // Fitted by the model's own hole
@@ -1948,8 +2464,8 @@ export class Engine3D {
     const scale = Math.max(
       inner > 1e-4
         ? (wristRadius * PLACE.bangleHoleFit) / inner
-        : wristWidth * PLACE.braceletWidth,
-      PLACE.braceletMinPx,
+        : wristWidth * PLACE.bangleWidth,
+      PLACE.bangleMinPx,
     ) * (entry.tuning.scale ?? 1);
 
     const holeRadius = inner > 1e-4 ? inner * scale : wristRadius * PLACE.bangleHoleFit;
@@ -1957,8 +2473,8 @@ export class Engine3D {
 
     // Seat
     _pos.copy(_v1)
-      .addScaledVector(_n1, wristWidth * PLACE.braceletSlide)
-      .addScaledVector(_n3, -wristRadius * PLACE.braceletDepth);
+      .addScaledVector(_n1, wristWidth * PLACE.bangleSlide)
+      .addScaledVector(_n3, -wristRadius * PLACE.bangleDepth);
 
     // A real bangle is loose and gravity parks it on the underside of the wrist
     const sag = slack * PLACE.bangleSag;
@@ -1980,7 +2496,7 @@ export class Engine3D {
     if (this._outOfFrame(_pos, scale) || visible <= 0.01) {
       this.place(inst, _pos, scale, _q1, false);
       this._forgetMask(`forearm${index}`);
-      return;
+      return false;
     }
 
     this.place(inst, _pos, scale, _q1, true, visible);
@@ -2003,7 +2519,7 @@ export class Engine3D {
     _mPos.set(st.position.x, st.position.y, st.depth)
       // The arm does not sag with the bangle, and it does not take the seat push
       .addScaledVector(_v8, -st.scale * sag * inv)
-      .addScaledVector(_v4, st.scale * wristRadius * PLACE.braceletDepth * inv)
+      .addScaledVector(_v4, st.scale * wristRadius * PLACE.bangleDepth * inv)
       // Centre of a mask that reaches further up the arm than down it
       .addScaledVector(_v3, st.scale * (toElbow - toHand) * 0.5 * inv);
 
@@ -2013,6 +2529,8 @@ export class Engine3D {
     this._placeMask(
       this.occluders.forearm[index], `forearm${index}`, _mPos, st.quaternion, _mScale, false,
     );
+
+    return true;
   }
 
   // Frame update
@@ -2050,7 +2568,7 @@ export class Engine3D {
         if (entry.category === 'necklace') ok = this.updateNecklace(entry, tracking);
         else if (entry.category === 'earring') ok = this.updateEarrings(entry, tracking);
         else if (entry.category === 'ring') ok = this.updateRing(entry, tracking);
-        else if (entry.category === 'bracelet') ok = this.updateBracelet(entry, tracking);
+        else if (entry.category === 'bangles') ok = this.updateBangles(entry, tracking);
       } catch (err) {
         // A throw here is not a tracking problem, it is a bug in the placement code — and its…
         const signature = String(err && err.message ? err.message : err);
@@ -2088,13 +2606,13 @@ export class Engine3D {
         if (HIDE_UNDER_HANDS) { hands = true; handCount = 2; }
       }
       if (entry.category === 'necklace') pose = true;
-      if (entry.category === 'ring' || entry.category === 'bracelet') hands = true;
+      if (entry.category === 'ring' || entry.category === 'bangles') hands = true;
       // Only the ring reads individual finger joints
       if (entry.category === 'ring') precise = true;
       // A bangle rides the forearm, so Pose's elbow is what keeps it off the hand
-      if (entry.category === 'bracelet') pose = true;
+      if (entry.category === 'bangles') pose = true;
       // A paired bangle needs both wrists detected
-      if (entry.category === 'bracelet' && entry.instances.length === 2) handCount = 2;
+      if (entry.category === 'bangles' && entry.instances.length === 2) handCount = 2;
     }
     return { face, hands, pose, handCount, precise };
   }
@@ -2274,7 +2792,7 @@ function normalizeModel(object, category, tuning) {
   }
 
   // A ring and a bangle are both worn THROUGH their hole
-  const hoop = (category === 'ring' || category === 'bracelet')
+  const hoop = (category === 'ring' || category === 'bangles')
     ? measureHoopRadii(object)
     : null;
 
@@ -2567,7 +3085,7 @@ function findPivot(object, category, norm) {
   const spanY = box.max.y - box.min.y;
   if (spanY < 1e-9) return null;
 
-  const isHoop = category === 'ring' || category === 'bracelet' || category === 'necklace';
+  const isHoop = category === 'ring' || category === 'bangles' || category === 'necklace';
 
   // Band to average over
   const loFrac = isHoop ? 0.42 : 0.88;
@@ -2614,7 +3132,7 @@ function applyCanonicalRotation(object, size, category) {
   const dims = [size.x, size.y, size.z];
   const thin = dims.indexOf(Math.min(...dims));
 
-  if (category === 'ring' || category === 'bracelet') {
+  if (category === 'ring' || category === 'bangles') {
     // thin axis → +Y
     if (thin === 0) object.rotation.z = Math.PI / 2;
     else if (thin === 2) object.rotation.x = -Math.PI / 2;
@@ -2647,7 +3165,7 @@ function applyCanonicalRotation(object, size, category) {
   }
 
   // Which way does the piece FACE?
-  if (category === 'ring' || category === 'bracelet' || category === 'earring') {
+  if (category === 'ring' || category === 'bangles' || category === 'earring') {
     if (needsFaceFlip(object)) {
       rotateWorld(object, 0, 1, 0, Math.PI);
       console.log(`[Engine3D] auto-rotated a ${category} so its detail faces outward`);
@@ -2655,7 +3173,7 @@ function applyCanonicalRotation(object, size, category) {
   }
 }
 
-// Which side of a ring/bracelet carries its decoration? A plain band is symmetric about…
+// Which side of a ring/bangle carries its decoration? A plain band is symmetric about…
 function needsFaceFlip(object) {
   object.updateMatrixWorld(true);
 
@@ -3317,7 +3835,7 @@ export async function resolveObjFile(folder) {
   for (const name of [...OBJ_CANDIDATES, `${folder}.obj`]) {
     try {
       // no-cache, so a folder that has just had its first model dropped in is not reported empty
-      const res = await fetch(`objects/${folder}/${name}`, { method: 'HEAD', cache: 'no-cache' });
+      const res = await fetch(`${OBJECTS_BASE}${folder}/${name}`, { method: 'HEAD', cache: 'no-cache' });
       if (res.ok) return name;
     } catch {
       // try the next candidate
@@ -3328,17 +3846,32 @@ export async function resolveObjFile(folder) {
 
 export async function probeFolder(folder) {
   const objFile = await resolveObjFile(folder);
-  return objFile ? { folder, objFile, available: true } : { folder, available: false };
+  let image = null;
+  for (const name of ['demo.jpg', 'demo.jpeg', 'demo.png', 'demo.webp', 'preview.jpg', 'preview.png']) {
+    try {
+      const res = await fetch(`${OBJECTS_BASE}${folder}/${name}`, { method: 'HEAD', cache: 'no-cache' });
+      if (res.ok) {
+        // Cache-bust so phones do not keep a broken/blank preview forever.
+        image = `${OBJECTS_BASE}${folder}/${name}?v=1`;
+        break;
+      }
+    } catch {
+      // next candidate
+    }
+  }
+  return objFile
+    ? { folder, objFile, available: true, image }
+    : { folder, available: false, image };
 }
 
 // The four categories the engine knows how to PLACE
-export const CATEGORY_ORDER = ['necklace', 'earring', 'ring', 'bracelet'];
+export const CATEGORY_ORDER = ['necklace', 'earring', 'ring', 'bangles'];
 
 export const CATEGORY_LABELS = {
   necklace: 'Necklace',
   earring: 'Earrings',
   ring: 'Ring',
-  bracelet: 'Bangles',
+  bangles: 'Bangles',
 };
 
 // Fallback list, used only when objects/index.json is absent
@@ -3346,13 +3879,13 @@ export const FOLDER_CATALOG = [
   'necklace-gold', 'necklace-diamond', 'necklace-mala',
   'earring-gold', 'earring-diamond', 'earring-hoop',
   'ring-band', 'ring-solitaire',
-  'bangle-gold', 'bangle-diamond',
+  'bangles-gold', 'bangles-diamond',
 ];
 
 // Reads objects/index.json, if there is one
 async function readManifest() {
   try {
-    const res = await fetch('objects/index.json', { cache: 'no-cache' });
+    const res = await fetch(`${OBJECTS_BASE}index.json`, { cache: 'no-cache' });
     if (!res.ok) return null;
 
     const data = await res.json();
@@ -3399,6 +3932,7 @@ export async function discoverItems() {
       label: entry.label || folderToLabel(entry.folder, category),
       objFile: found.objFile,
       available: found.available,
+      image: found.image || null,
     };
   }));
 
@@ -3407,9 +3941,13 @@ export async function discoverItems() {
 
 // Names that mean the same category
 const CATEGORY_ALIASES = {
-  bangle: 'bracelet',
-  bangles: 'bracelet',
-  kada: 'bracelet',
+  // The category is `bangles` now. `bracelet` stays understood on the way in, so
+  // a shop that already uploaded a folder named bracelet-gold keeps working
+  // without having to rename anything.
+  bracelet: 'bangles',
+  bracelets: 'bangles',
+  bangle: 'bangles',
+  kada: 'bangles',
   chain: 'necklace',
   pendant: 'necklace',
   studs: 'earring',
@@ -3436,6 +3974,13 @@ export function folderToCategory(folder) {
   const joined = words.join('');
   for (const cat of CATEGORY_ORDER) {
     if (joined.includes(cat)) return cat;
+  }
+  // The aliases have to be searched here too, not just word by word above. A
+  // folder named with no separators at all — "goldbracelet" — only ever matched
+  // through this fallback, and renaming the category would otherwise have
+  // stopped it resolving.
+  for (const alias of Object.keys(CATEGORY_ALIASES)) {
+    if (joined.includes(alias)) return CATEGORY_ALIASES[alias];
   }
   return null;
 }
