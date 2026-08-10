@@ -17,7 +17,9 @@
     "Use the long form when the folder name cannot say it for you:",
     "  { \"folder\": \"aurora-set-01\", \"category\": \"necklace\", \"label\": \"Aurora\" }",
     "",
-    "Supported categories: necklace, earring, ring, bracelet.",
+    "Supported categories: necklace, earring, ring, bangles.",
+    "'bracelet', 'bangle' and 'kada' are all understood as bangles too, so a",
+    "folder uploaded under any of those names still works.",
     "A folder listed here with no loadable model shows as unavailable rather",
     "than disappearing, so a missing upload is visible instead of silent.",
     "",
@@ -33,7 +35,7 @@
     "earring-hoop",
     "ring-band",
     "ring-solitaire",
-    "bracelet-gold",
-    "bracelet-diamond"
+    "bangles-gold",
+    "bangles-diamond"
   ]
 }

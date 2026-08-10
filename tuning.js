@@ -1,10 +1,9 @@
-// Live tuning panel — enabled with ?tune=1 in the URL.
+// Live tuning panel — enabled with ?tune=1 in the URL
 
-// Must match the specifier app.js uses, or this loads a SECOND engine module
-// with its own separate MODEL_TUNING — see the import map in index.html.
+// Must match the specifier app.js uses
 import { clearSavedTuning } from 'vto/engine3d.js';
 
-// Keep an angle inside the sliders' -180..180 range.
+// Keep an angle inside the sliders' -180..180 range
 const wrapDeg = (deg) => (((deg + 180) % 360) + 360) % 360 - 180;
 
 // The three material sliders are OVERRIDES, and they behave differently from the rest:
@@ -20,7 +19,7 @@ const FIELDS = [
   { key: 'roughness', label: 'Polish', min: 0.02, max: 1, step: 0.01, def: 0.30, group: 'Material' },
   { key: 'envIntensity', label: 'Reflections', min: 0, max: 3, step: 0.05, def: 1, group: 'Material' },
 
-  // Earring-only. Where the piercing sits varies from face to face and from model to…
+  // Earring-only
   { key: 'earDrop', label: 'Ear ↓', min: -0.8, max: 1.2, step: 0.01, def: 0.18, only: 'earring', group: 'Earring fit' },
   { key: 'earOut', label: 'Ear ↔', min: -0.4, max: 0.8, step: 0.01, def: 0.14, only: 'earring', group: 'Earring fit' },
   { key: 'earBack', label: 'Ear ↕ depth', min: -0.6, max: 0.6, step: 0.01, def: 0.08, only: 'earring', group: 'Earring fit' },
@@ -129,7 +128,6 @@ export function createTuner(engine, getActiveItems) {
     panel.appendChild(anchorRow);
 
     // The two orientation mistakes an exported model actually makes:
-    // the wrong way up, or facing away from the camera.
     const flipRow = document.createElement('div');
     flipRow.className = 'vt-anchor';
 
@@ -150,7 +148,7 @@ export function createTuner(engine, getActiveItems) {
     flipRow.append(flipUp, flipFace);
     panel.appendChild(flipRow);
 
-    // Pair mirroring — only meaningful for the two-copy categories.
+    // Pair mirroring — only meaningful for the two-copy categories
     if (tuning.pair === 2) {
       const pairRow = document.createElement('div');
       pairRow.className = 'vt-anchor';
@@ -167,7 +165,7 @@ export function createTuner(engine, getActiveItems) {
       panel.appendChild(pairRow);
     }
 
-    // Sliders. `only` fields appear just for the category they belong to.
+    // Sliders
     let shownGroup = null;
     for (const f of FIELDS) {
       if (f.only && tuning.category !== f.only) continue;
@@ -198,7 +196,7 @@ export function createTuner(engine, getActiveItems) {
       slider.step = f.step;
       slider.value = current;
 
-      // Rotation re-bakes the model, so only commit on release.
+      // Rotation re-bakes the model, so only commit on release
       const evt = f.rebake ? 'change' : 'input';
       slider.addEventListener('input', () => { val.textContent = fmt(+slider.value, f); });
       slider.addEventListener(evt, () => {

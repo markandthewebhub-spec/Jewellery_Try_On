@@ -1,22 +1,34 @@
-/* Jewellery Try On – Black & Gold Theme */
+﻿/* Jewellery Try On â€“ Black & Gold Theme */
 
 :root {
-  --gold: #D4AF37;
-  --gold-light: #F0D878;
-  --gold-dark: #9A7B2C;
-  --black-deep: #0B0B0B;
-  --black-card: #141414;
-  --black-elevated: #1C1C1C;
-  --text-primary: #F5F0E8;
-  --text-secondary: #A09A90;
-  --text-muted: #6B6560;
-  --border-gold: rgba(212, 175, 55, 0.25);
+  /* CREAM GOLD
+     The old set was built around a saturated D4AF37 with an almost neon F0D878
+     highlight. On large display type against black that glares. These are the
+     same family pulled toward champagne: lower saturation, a touch warmer, a
+     touch deeper, so it still reads as gold but stops shouting. */
+  --gold: #C5A464;
+  --gold-light: #E6D7B4;
+  --gold-dark: #7E6733;
+
+  /* Same three as RGB triples, for the many rgba() glows and borders below */
+  --gold-rgb: 197, 164, 100;
+  --gold-light-rgb: 230, 215, 180;
+
+  /* Warm near-blacks rather than neutral greys — jewellery photographs warm,
+     and a cold grey card behind it reads as cheap */
+  --black-deep: #0A0908;
+  --black-card: #131210;
+  --black-elevated: #1B1917;
+  --text-primary: #F2ECE0;
+  --text-secondary: #9C958A;
+  --text-muted: #6A645C;
+  --border-gold: rgba(var(--gold-rgb), 0.22);
   --radius-camera: 20px;
   --radius-action: 14px;
   --btn-jewellery-w: 148px;
   --btn-jewellery-h: 48px;
-  --shadow-gold: 0 0 24px rgba(212, 175, 55, 0.22);
-  --shadow-gold-strong: 0 0 40px rgba(212, 175, 55, 0.35);
+  --shadow-gold: 0 0 24px rgba(var(--gold-rgb), 0.22);
+  --shadow-gold-strong: 0 0 40px rgba(var(--gold-rgb), 0.35);
   --shadow-card: 0 12px 48px rgba(0, 0, 0, 0.55);
   --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --font-display: 'Playfair Display', Georgia, serif;
@@ -57,25 +69,39 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.9rem 1.25rem;
+  gap: 0.2rem;
+  padding: 0.7rem 1.25rem 0.75rem;
   background: var(--black-deep);
-  border-bottom: 2px solid var(--gold-dark);
+  /* A flat 2px bar read as a rule drawn across the page. A hairline that fades
+     out at both ends reads as a finish. */
+  border-bottom: 0;
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.6);
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dark) 18%, var(--gold) 50%, var(--gold-dark) 82%, transparent);
 }
 
 .header-title {
   font-family: var(--font-display);
-  font-size: 1.5rem;
+  font-size: 1.18rem;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--gold);
+  font-style: italic;
+  letter-spacing: 0.07em;
+  color: var(--gold-light);
 }
 
 .header-subtitle {
-  font-size: 0.78rem;
+  font-size: 0.68rem;
   font-weight: 300;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -108,11 +134,19 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.25rem 1rem 2rem;
-  max-width: 640px;
+  /* No gap and no padding of its own. Only one view is ever on screen, so the
+     gap never separated anything, and the side padding stacked on top of the
+     padding .vto-view already carries — together they ate about 2rem of width
+     on a phone. Each view owns its own spacing now. */
+  gap: 0;
+  padding: 0;
+  /* The old 640px cap meant the "PC fills left→right" grid rules below could
+     never apply: the 4- and 5-column breakpoints were unreachable, so a desktop
+     showed a narrow 2-column strip with empty black either side. */
+  max-width: none;
   margin: 0 auto;
   width: 100%;
+  min-width: 0;
 }
 
 /* Camera Section */
@@ -124,8 +158,15 @@ body {
 
 .viewport-wrapper {
   position: relative;
-  width: 100%;
-  max-width: 520px;
+  /* Sized from the HEIGHT it is allowed to occupy, with the width following
+     from the aspect ratio. Sizing from the width instead (the old
+     `width:100%`) made the box 693px tall on a laptop — taller than the space
+     left under the header and controls, so the page scrolled — while on a tall
+     phone it left a band of dead black below. */
+  --vto-cam-h: min(68vh, 620px);
+  width: min(100%, calc(var(--vto-cam-h) * 3 / 4));
+  max-width: 560px;
+  height: auto;
   margin: 0 auto;
   aspect-ratio: 3 / 4;
   background: var(--black-card);
@@ -158,7 +199,7 @@ body {
   height: 100%;
   pointer-events: none;
   z-index: 2;
-  /* NOTE: do NOT mirror this canvas. */
+  /* NOTE: */
 }
 
 .camera-placeholder {
@@ -169,20 +210,12 @@ body {
   align-items: center;
   justify-content: center;
   gap: 1.25rem;
-  background: radial-gradient(ellipse at center, #1a1a1a 0%, var(--black-deep) 100%);
+  background: radial-gradient(ellipse at center, #191714 0%, var(--black-deep) 100%);
   z-index: 1;
   padding: 2rem;
 }
 
 .camera-placeholder.hidden { display: none; }
-
-.placeholder-ring {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: 2px solid var(--gold-dark);
-  box-shadow: var(--shadow-gold);
-}
 
 .camera-placeholder p {
   text-align: center;
@@ -203,7 +236,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background: rgba(11, 11, 11, 0.82);
+  background: rgba(10, 9, 8, 0.86);
   backdrop-filter: blur(4px);
 }
 
@@ -229,7 +262,7 @@ body {
 
 .btn {
   font-family: var(--font-body);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 500;
   border: none;
   cursor: pointer;
@@ -256,32 +289,10 @@ body {
   cursor: not-allowed;
 }
 
-/* Jewellery Section */
-.jewellery-section {
-  animation: fadeIn 0.45s ease 0.15s both;
-}
-
 .jewellery-controls {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-
-.jewellery-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.group-title {
-  font-family: var(--font-display);
-  font-size: 1rem;
-  font-weight: 500;
-  color: var(--gold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding-bottom: 0.35rem;
-  border-bottom: 1px solid var(--border-gold);
 }
 
 .jewellery-buttons {
@@ -337,7 +348,7 @@ body {
   opacity: 0.32;
   border-style: solid;
   filter: saturate(0.4);
-  /* Stays clickable on purpose — the handler explains why it is locked. */
+  /* Stays clickable on purpose â€” the handler explains why it is locked */
   cursor: pointer;
 }
 
@@ -345,7 +356,7 @@ body {
   opacity: 0.45;
 }
 
-/* Briefly draws attention to Start Camera when a locked piece is tapped. */
+/* Briefly draws attention to Start Camera when a locked piece is tapped */
 .btn-action.nudge {
   animation: nudge 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
 }
@@ -362,16 +373,8 @@ body {
   .btn-action.nudge { animation: none; }
 }
 
-.jewellery-controls.locked .group-title {
-  opacity: 0.5;
-}
-
 .jewellery-btn.unavailable.active {
   opacity: 0.45;
-}
-
-.jewellery-btn.placeholder {
-  border-style: dashed;
 }
 
 /* Footer */
@@ -394,29 +397,772 @@ body {
   }
 }
 
-/* Toast Notification */
-.toast {
-  position: fixed;
-  left: 50%;
-  bottom: 28px;
-  transform: translate(-50%, 16px);
-  z-index: 500;
-  max-width: 90%;
-  padding: 0.8rem 1.3rem;
-  border-radius: var(--radius-action);
-  background: var(--black-elevated);
-  border: 1.5px solid var(--gold-dark);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  font-weight: 500;
-  text-align: center;
-  box-shadow: var(--shadow-card), var(--shadow-gold);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease, transform 0.25s ease;
+/* —— Collection layout (full width, auto grid) —— */
+.vto-view--home {
+  padding-top: 0.45rem;
 }
 
-.toast.show {
-  opacity: 1;
-  transform: translate(-50%, 0);
+.product-shelf__eyebrow {
+  font-family: var(--font-body);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.5rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+}
+
+.product-shelf__eyebrow::before,
+.product-shelf__eyebrow::after {
+  content: '';
+  flex: 0 1 52px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dark) 20%, var(--gold) 50%, var(--gold-dark) 80%, transparent);
+  opacity: 0.85;
+}
+
+.product-shelf__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 3vw, 1.62rem);
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  color: var(--gold-light);
+  text-align: center;
+  margin-bottom: 1.1rem;
+  text-shadow: 0 0 36px rgba(var(--gold-rgb), 0.28);
+  text-wrap: balance;
+}
+
+.product-shelf__empty {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: 1rem;
+}
+
+.vto-view {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  /* Bottom padding was 2.5rem, which read as a blank band under the grid on a
+     phone. The side padding is now the only horizontal inset on the page. */
+  padding: 0.6rem clamp(0.7rem, 2.5vw, 2rem) 1rem;
+  box-sizing: border-box;
+}
+
+/* Detail page: tighter layout, less empty black space */
+.vto-view--detail {
+  padding-top: 0.35rem;
+  padding-bottom: 1.35rem;
+}
+
+.vto-view--detail .vto-back {
+  margin-bottom: 0.55rem;
+  padding: 0.5rem 0.95rem;
+  border: 1px solid rgba(var(--gold-rgb), 0.4);
+  border-radius: 999px;
+  background: rgba(20, 20, 20, 0.75);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--gold-light);
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.vto-view--detail .vto-back:hover,
+.vto-view--detail .vto-back:focus-visible {
+  background: rgba(var(--gold-rgb), 0.12);
+  border-color: var(--gold);
+  outline: none;
+}
+
+.vto-view--detail .product-detail-panel {
+  margin-top: 0;
+}
+
+.vto-view.hidden,
+.vto-view[hidden] {
+  display: none !important;
+}
+
+.vto-back {
+  display: inline-flex;
+  margin: 0 0 0.85rem;
+  padding: 0.4rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--gold);
+  font: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+/* Try On screen: visible back + luxury piece title */
+.vto-view--tryon {
+  padding-top: 0.2rem;
+}
+
+/* Same reasoning as the WordPress copy: on the camera screen the subtitle is
+   spent, and removing it lifts the piece name up. */
+.main:has(#view-tryon:not([hidden])) .header-subtitle {
+  display: none;
+}
+
+.tryon-topbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+}
+
+/* BACK BUTTON
+   It has to read as a button at a glance. A bare gold-on-black outline
+   disappeared against the page, so this one carries its own lit surface: a gold
+   wash across the fill, a full-strength gold border, and an inner highlight
+   along the top edge that makes it sit proud of the background. */
+.vto-back--tryon {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.6rem 1.25rem;
+  border: 1.5px solid var(--gold);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(var(--gold-rgb), 0.28) 0%, rgba(24, 21, 14, 0.94) 58%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--gold-light) !important;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.5),
+    0 0 22px rgba(var(--gold-rgb), 0.26),
+    inset 0 1px 0 rgba(255, 241, 176, 0.22);
+  transition: background var(--transition), border-color var(--transition),
+              box-shadow var(--transition), transform 0.2s ease;
+}
+
+.vto-back--tryon:hover,
+.vto-back--tryon:focus-visible {
+  background:
+    linear-gradient(135deg, rgba(var(--gold-rgb), 0.45) 0%, rgba(32, 27, 16, 0.96) 62%);
+  border-color: var(--gold-light);
+  box-shadow:
+    0 6px 26px rgba(0, 0, 0, 0.55),
+    0 0 34px rgba(var(--gold-rgb), 0.42),
+    inset 0 1px 0 rgba(255, 241, 176, 0.32);
+  /* Slides back the way it is about to take you */
+  transform: translateX(-3px);
+  outline: none;
+}
+
+.vto-back--tryon:active {
+  transform: translateX(-1px) scale(0.98);
+}
+
+/* PIECE NAME
+   The hero of this screen, so it gets the polished-metal treatment: a gold
+   gradient poured through the glyphs rather than one flat fill. */
+.tryon-piece-label {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 3.6vw, 1.8rem);
+  font-weight: 700;
+  font-style: italic;
+  letter-spacing: 0.035em;
+  line-height: 1.15;
+  margin: 0;
+  padding: 0 0.5rem;
+  color: var(--gold-light);
+  text-shadow:
+    0 0 30px rgba(var(--gold-light-rgb), 0.34),
+    0 2px 10px rgba(0, 0, 0, 0.6);
+  text-wrap: balance;
+}
+
+/* Guarded: without background-clip support, transparent glyphs would render the
+   name invisible rather than merely flat. */
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .tryon-piece-label {
+    background: linear-gradient(
+      100deg,
+      var(--gold-dark) 0%,
+      var(--gold-light) 38%,
+      #F2E6C8 50%,
+      var(--gold) 68%,
+      var(--gold-dark) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    /* Beats a `color: … !important` from the theme layer, which text-shadow
+       below still needs to sit under */
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+    filter: drop-shadow(0 0 26px rgba(var(--gold-light-rgb), 0.30))
+            drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+  }
+}
+
+/* A hairline flourish under the name, the same motif the collection eyebrow uses */
+.tryon-piece-label::after {
+  content: '';
+  display: block;
+  width: min(150px, 45%);
+  height: 1px;
+  margin: 0.4rem auto 0;
+  background: linear-gradient(90deg, transparent, var(--gold-dark) 22%, var(--gold) 50%, var(--gold-dark) 78%, transparent);
+}
+
+@media (min-width: 768px) {
+  /* One row instead of two: the back button on the left, the name centred on
+     the SAME line. That is what lifts the name up the screen — it no longer
+     waits for a line of its own below the button. */
+  .tryon-topbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.75rem 1rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .vto-back--tryon {
+    grid-column: 1;
+    justify-self: start;
+  }
+
+  .tryon-topbar .tryon-piece-label {
+    grid-column: 2;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Phone = exactly 2 cols · tablet 3 · PC fills left→right */
+.product-grid {
+  display: grid;
+  width: 100%;
+  box-sizing: border-box;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  /* Past this the tiles stop growing and the row centres instead. Without it a
+     2560px monitor stretched five tiles to ~490px each. */
+  max-width: 1680px;
+  margin-inline: auto;
+}
+
+@media (min-width: 768px) {
+  .product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.15rem;
+  }
+}
+
+@media (min-width: 1400px) {
+  .product-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+/* The name used to sit in its own strip below the photo, divided off by a hard
+   gold rule — which read as a table row, not a lookbook. It now lies ON the
+   photograph under a scrim, the way a catalogue captions a plate. */
+.product-tile {
+  position: relative;
+  display: block;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border-gold);
+  border-radius: 14px;
+  background: var(--black-card);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  overflow: hidden;
+  min-width: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.35s cubic-bezier(0.2, 0, 0.2, 1),
+              box-shadow 0.35s cubic-bezier(0.2, 0, 0.2, 1),
+              border-color 0.35s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.product-tile:hover,
+.product-tile:focus-visible {
+  transform: translateY(-3px);
+  border-color: rgba(var(--gold-rgb), 0.55);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.55),
+    0 0 26px rgba(var(--gold-rgb), 0.15);
+  outline: none;
+}
+
+.product-tile__media {
+  width: 100%;
+  /* Portrait rather than square — jewellery hangs, and a taller plate reads as
+     editorial where a square reads as a product-feed thumbnail */
+  aspect-ratio: 4 / 5;
+  background: #0E0D0B;
+  overflow: hidden;
+}
+
+.product-tile__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+  transition: transform 0.6s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+.product-tile:hover .product-tile__media img,
+.product-tile:focus-visible .product-tile__media img {
+  transform: scale(1.05);
+}
+
+.product-tile__media.is-fallback {
+  background: radial-gradient(circle at 50% 38%, rgba(var(--gold-rgb), 0.16), #100F0D 62%);
+}
+
+/* Two classes deep on purpose: wp-widget.css zeroes margin and padding on every
+   `span` inside the widget, and that rule out-specifies a lone class. */
+.product-tile .product-tile__name {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: block;
+  margin: 0;
+  /* Tall top padding so the scrim has room to fade in above the words */
+  padding: 2.4rem 0.6rem 0.75rem;
+  border-top: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 9, 8, 0) 0%,
+    rgba(10, 9, 8, 0.5) 40%,
+    rgba(10, 9, 8, 0.92) 100%
+  );
+  font-family: var(--font-display);
+  font-size: clamp(0.82rem, 1.9vw, 0.98rem);
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0.06em;
+  color: var(--gold-light);
+  line-height: 1.3;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
+  text-wrap: balance;
+  pointer-events: none;
+}
+
+.product-detail-panel { width: 100%; }
+
+.product-sheet {
+  border: 1px solid var(--border-gold);
+  border-radius: 16px;
+  background: linear-gradient(165deg, rgba(28,24,18,0.98), rgba(12,12,12,0.98));
+  overflow: hidden;
+  max-width: min(540px, 100%);
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .product-sheet {
+    max-width: min(480px, 100%);
+  }
+}
+
+.product-sheet__media {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #0e0e0e;
+}
+
+.product-sheet__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.product-sheet__media.is-fallback {
+  min-height: 200px;
+  background: radial-gradient(circle at 50% 40%, rgba(var(--gold-rgb),0.18), #141414 60%);
+}
+
+.product-sheet__body {
+  padding: 1.05rem 1.2rem 1.15rem;
+}
+
+.product-sheet__eyebrow {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 0.4rem;
+}
+
+.product-sheet__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.2rem, 3.2vw, 1.55rem);
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  line-height: 1.12;
+  color: var(--gold-light);
+  margin: 0 0 0.55rem;
+  padding-top: 0.2rem;
+  text-shadow: 0 0 28px rgba(var(--gold-light-rgb), 0.32);
+  text-wrap: balance;
+}
+
+.product-sheet__lead {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  margin-bottom: 0.65rem;
+}
+
+.product-sheet__list {
+  margin: 0 0 0.85rem 1.1rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.jewellery-controls--sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.btn-tryon-glow {
+  animation: vtoTryonGlow 2.4s ease-in-out infinite;
+  box-shadow: var(--shadow-gold);
+}
+
+@keyframes vtoTryonGlow {
+  0%, 100% { box-shadow: 0 0 18px rgba(var(--gold-rgb), 0.2); }
+  50% { box-shadow: 0 0 34px rgba(var(--gold-rgb), 0.45); }
+}
+
+.vto-product-tryon {
+  margin: 12px 0 4px;
+  text-align: center;
+  position: relative;
+  z-index: 5;
+}
+
+.vto-product-tryon--bar {
+  margin: 0;
+  width: 100%;
+}
+
+.vto-product-tryon__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0.85rem 1.4rem;
+  background: linear-gradient(120deg, #A88544 0%, #E6D7B4 42%, #7E6733 100%);
+  color: #140f05 !important;
+  border: 2px solid #F2E6C8;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-decoration: none !important;
+  line-height: 1.2;
+  overflow: hidden;
+  cursor: pointer;
+  isolation: isolate;
+  white-space: nowrap;
+  box-shadow:
+    0 0 0 3px rgba(var(--gold-rgb), 0.22),
+    0 12px 28px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(var(--gold-light-rgb), 0.35);
+  animation: vtoTryonGlow 2.2s ease-in-out infinite;
+}
+
+.vto-product-tryon__btn:hover,
+.vto-product-tryon__btn:focus-visible {
+  transform: translateY(-2px) scale(1.02);
+  color: #1a1204 !important;
+  outline: none;
+}
+
+.vto-product-tryon__label { position: relative; z-index: 2; }
+
+.vto-product-tryon__shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.55) 50%, transparent 60%);
+  transform: translateX(-120%);
+  animation: vtoTryonShine 2.8s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.vto-product-tryon__pulse {
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 2px solid rgba(var(--gold-light-rgb), 0.75);
+  animation: vtoTryonPulse 2s ease-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes vtoTryonShine {
+  0%, 55% { transform: translateX(-120%); }
+  75%, 100% { transform: translateX(120%); }
+}
+
+@keyframes vtoTryonPulse {
+  0% { transform: scale(1); opacity: 0.85; }
+  70% { transform: scale(1.08); opacity: 0; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+
+/* ============================================================
+   RESPONSIVE LAYOUT
+   ============================================================ */
+
+/* `dvh` tracks the address bar sliding away on a phone; `vh` does not, which is
+   why a 100vh page scrolls by exactly the height of that bar. Declared as an
+   upgrade so a browser without `dvh` keeps the `vh` values above. */
+@supports (height: 1dvh) {
+  body { min-height: 100dvh; }
+  #app { min-height: 100dvh; }
+  .viewport-wrapper { --vto-cam-h: min(68dvh, 620px); }
+}
+
+/* Small phones: the three camera buttons share the row evenly instead of one
+   of them wrapping onto a line of its own. */
+@media (max-width: 480px) {
+  .camera-controls {
+    gap: 0.45rem;
+  }
+
+  .camera-controls .btn-action {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.7rem 0.45rem;
+    font-size: 0.76rem;
+    letter-spacing: 0.01em;
+  }
+}
+
+/* Desktop: the camera has room to grow, and the header does not need to be as
+   tall as it is on a phone. */
+@media (min-width: 1024px) {
+  .viewport-wrapper {
+    --vto-cam-h: min(72vh, 700px);
+  }
+}
+
+@supports (height: 1dvh) {
+  @media (min-width: 1024px) {
+    .viewport-wrapper { --vto-cam-h: min(72dvh, 700px); }
+  }
+}
+
+/* Landscape phone / short window: height is the scarce axis, so the camera goes
+   wide and the controls move beside it rather than under it. */
+@media (orientation: landscape) and (max-height: 620px) {
+  .header {
+    padding: 0.4rem 1rem 0.45rem;
+    gap: 0.1rem;
+  }
+
+  .header-title { font-size: 1.05rem; }
+  .header-subtitle { display: none; }
+  .footer { display: none; }
+
+  .vto-view {
+    padding-top: 0.35rem;
+    padding-bottom: 0.45rem;
+  }
+
+  /* Undo the ≥768px topbar rules — a landscape phone is wide enough to match
+     them, but not tall enough to spend a line on a centred title. */
+  .tryon-topbar {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.6rem;
+    min-height: 0;
+    margin-bottom: 0.4rem;
+  }
+
+  .vto-back--tryon {
+    position: static;
+    padding: 0.4rem 0.85rem;
+    font-size: 0.8rem;
+  }
+
+  .tryon-topbar .tryon-piece-label {
+    flex: 1 1 auto;
+    font-size: 1.05rem;
+    text-align: left;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Video on the left, everything that drives it stacked on the right. */
+  .camera-section {
+    display: grid;
+    grid-template-columns: auto minmax(0, 200px);
+    grid-template-rows: auto auto;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem 0.85rem;
+  }
+
+  .viewport-wrapper {
+    --vto-cam-h: 76vh;
+    aspect-ratio: 4 / 3;
+    width: min(100%, calc(var(--vto-cam-h) * 4 / 3));
+    max-width: none;
+    margin: 0;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .camera-controls {
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 0.45rem;
+  }
+
+  .camera-controls .btn-action {
+    width: 100%;
+    padding: 0.55rem 0.6rem;
+    font-size: 0.76rem;
+  }
+
+  .vto-finger-picker {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+  }
+}
+
+@supports (height: 1dvh) {
+  @media (orientation: landscape) and (max-height: 620px) {
+    .viewport-wrapper { --vto-cam-h: 76dvh; }
+  }
+}
+
+/* ============================================================
+   RING FINGER PICKER
+   Only rendered while a ring is the active piece.
+   ============================================================ */
+
+.vto-finger-picker {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.vto-finger-picker[hidden] { display: none; }
+
+/* Tapping the finger on the camera is the only way to pick one, and no one
+   guesses a gesture. So this is a lit prompt, not a footnote: gold-washed pill,
+   breathing glow, and a pulsing dot that says "this screen wants a touch".
+
+   Two classes deep because wp-widget.css zeroes margin and padding on every
+   `p` inside the widget, and that rule out-specifies a lone class. */
+.vto-finger-picker .vto-finger-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.6rem 1.15rem;
+  border: 1px solid rgba(var(--gold-rgb), 0.55);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(var(--gold-rgb), 0.17) 0%, rgba(19, 18, 16, 0.94) 62%);
+  color: var(--gold-light);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  text-align: center;
+  text-wrap: balance;
+  animation: vtoHintGlow 2.6s ease-in-out infinite;
+}
+
+.vto-finger-hint__dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold-light);
+  animation: vtoHintPing 1.9s ease-out infinite;
+}
+
+@keyframes vtoHintGlow {
+  0%, 100% { box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 16px rgba(var(--gold-rgb), 0.14); }
+  50%      { box-shadow: 0 4px 22px rgba(0, 0, 0, 0.5),  0 0 30px rgba(var(--gold-rgb), 0.34); }
+}
+
+@keyframes vtoHintPing {
+  0%   { box-shadow: 0 0 0 0 rgba(var(--gold-light-rgb), 0.6); }
+  70%  { box-shadow: 0 0 0 9px rgba(var(--gold-light-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--gold-light-rgb), 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vto-finger-picker .vto-finger-hint,
+  .vto-finger-hint__dot {
+    animation: none;
+  }
+}
+
+/* The camera box has to accept taps for "tap the finger you want" to work.
+   #canvas3d keeps pointer-events:none so the tap lands on the wrapper. The
+   class is only set while a ring is the active piece — nothing else on the
+   camera is tappable, so the cursor should not suggest otherwise. */
+.viewport-wrapper.vto-pickable {
+  cursor: crosshair;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Kept in landscape, only tighter — it is the sole instruction for the gesture,
+   so hiding it would leave the feature undiscoverable on a phone held sideways. */
+@media (orientation: landscape) and (max-height: 620px) {
+  .vto-finger-picker .vto-finger-hint {
+    padding: 0.45rem 0.7rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
+    gap: 0.4rem;
+  }
 }
