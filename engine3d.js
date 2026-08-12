@@ -66,6 +66,12 @@ const HAND = {
 // The four knuckles, index to pinky — the fan the palm's own frame is fitted to
 const MCP_ROW = [5, 9, 13, 17];
 
+// Enough of the hand to stand in for its outline: the wrist, the thumb chain,
+// every knuckle, and each finger's middle joint and tip. A palm-centre-only test
+// misses a hand cupped over an ear, where the fingers do the covering and the
+// palm centre sits a whole hand-width away down by the jaw.
+const HAND_OUTLINE = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18, 20];
+
 // Finger chains, as [knuckle, middle joint, tip]
 const FINGER_CHAINS = [
   [5, 6, 8],     // index
@@ -131,6 +137,10 @@ const PLACE = {
   earringLobeDrop: 0.18,
   earringLobeOut: 0.14,
   earringLobeBack: 0.08,
+  // A hand raised to the ear hides the earring — measured against the whole
+  // hand outline, in knuckle spans, not just its palm centre
+  earHandReach: 0.55,
+  earHandFade: 0.35,
   // Earring orientation
   earringRollFollow: 0.55,
   earringHeadFollow: 0.82,
@@ -624,6 +634,7 @@ const _hcIndex = new THREE.Vector3();
 const _hcPinky = new THREE.Vector3();
 const _hcMiddle = new THREE.Vector3();
 const _hcPalm = new THREE.Vector3();
+const _hcPoint = new THREE.Vector3();
 
 // Builds a guaranteed-orthonormal rotation from a primary axis plus a rough secondary…
 function basisQuat(primaryUp, refFwd, outQuat) {
@@ -713,6 +724,287 @@ function newTorsoPose() {
 
 // How quickly the torso solution fades in and out of use, per 60fps frame
 const TORSO_BLEND_RATE = 0.08;
+
+// MODEL FORMATS
+//
+// Jewellery arrives in whatever the designer happened to export. These are the
+// formats a browser can genuinely open, listed in the order they are preferred
+// when one folder holds several — glTF first, because it is the only one on the
+// list actually designed for the web: smallest on the wire, with PBR materials
+// and textures inside the single file.
+//
+// Deliberately absent, and they cannot be added later either:
+//   STEP / IGES  NURBS surfaces. Nothing in a browser can tessellate them.
+//   .blend .ztl  Application save files, not interchange formats.
+//   .max .c4d    Same.
+// Those have to be converted before upload. In practice it costs nothing: a
+// marketplace listing offering them always offers a mesh format alongside.
+export const MODEL_FORMATS = [
+  {
+    ext: 'glb', label: 'glTF Binary', loader: 'gltf', binary: true, materials: 'embedded',
+    // glTF fixes the WORLD up-axis, but this engine needs a per-category pose —
+    // a ring lying flat, a necklace facing +Z — which a Y-up file says nothing
+    // about. So it gets the same bounding-box pass every other format gets.
+    autoOrient: true,
+  },
+  {
+    ext: 'gltf', label: 'glTF', loader: 'gltf', binary: false, materials: 'embedded',
+    autoOrient: true,
+  },
+  {
+    ext: 'obj', label: 'OBJ', loader: 'obj', binary: false, materials: 'mtl', autoOrient: true,
+    // The exact names this project has always probed for, kept so every folder
+    // added before multi-format support carries on working untouched
+    stems: ['model', 'scene', '1', '2', '3'],
+  },
+  {
+    ext: 'stl', label: 'STL', loader: 'stl', binary: true, materials: 'none', autoOrient: true,
+    // STL stores triangles and nothing else — no colour, no texture, no groups.
+    // Everything therefore renders in the default metal, which suits a plain
+    // band and does not suit a stone setting.
+    warn: 'STL carries no colours or materials, so the piece renders as one solid metal.',
+  },
+  { ext: 'ply', label: 'PLY', loader: 'ply', binary: true, materials: 'vertex', autoOrient: true },
+  { ext: 'fbx', label: 'FBX', loader: 'fbx', binary: true, materials: 'embedded', autoOrient: true },
+  { ext: '3ds', label: '3DS', loader: '3ds', binary: true, materials: 'embedded', autoOrient: true },
+  { ext: 'dae', label: 'Collada', loader: 'dae', binary: false, materials: 'embedded', autoOrient: true },
+  { ext: '3mf', label: '3MF', loader: '3mf', binary: true, materials: 'embedded', autoOrient: true },
+  {
+    ext: '3dm', label: 'Rhino 3DM', loader: '3dm', binary: true, materials: 'embedded',
+    autoOrient: true,
+    // Rhino is the jewellery trade's CAD tool, so 3DM turns up constantly. Two
+    // things to know about it:
+    //
+    //   · it needs a separate ~2 MB rhino3dm WASM build, fetched on first use
+    //   · Rhino works in NURBS — mathematical surfaces, not triangles. A file
+    //     saved without render meshes has literally nothing a browser can draw,
+    //     and it opens perfectly happily as an empty scene.
+    //
+    // The second one is why _loadTemplate counts meshes after parsing and says
+    // so plainly, rather than leaving a piece that silently never appears.
+    warn: 'Rhino files save NURBS surfaces; if this one has no render meshes saved with it, nothing will be drawn.',
+  },
+];
+
+// Filenames probed inside a folder, before the folder's own name is tried
+const DEFAULT_STEMS = ['model', 'scene'];
+
+// Every extension the catalogue will look for, highest priority first
+export const MODEL_EXTENSIONS = MODEL_FORMATS.map((f) => f.ext);
+
+// Fetched on demand, so a site that only ever serves GLB never downloads the
+// FBX loader. Resolved through the same `three/addons/` import-map entry the
+// static imports at the top of this file use.
+const LOADER_MODULES = {
+  gltf: () => import('three/addons/loaders/GLTFLoader.js').then((m) => m.GLTFLoader),
+  stl: () => import('three/addons/loaders/STLLoader.js').then((m) => m.STLLoader),
+  ply: () => import('three/addons/loaders/PLYLoader.js').then((m) => m.PLYLoader),
+  fbx: () => import('three/addons/loaders/FBXLoader.js').then((m) => m.FBXLoader),
+  '3ds': () => import('three/addons/loaders/TDSLoader.js').then((m) => m.TDSLoader),
+  dae: () => import('three/addons/loaders/ColladaLoader.js').then((m) => m.ColladaLoader),
+  '3mf': () => import('three/addons/loaders/3MFLoader.js').then((m) => m.ThreeMFLoader),
+  '3dm': () => import('three/addons/loaders/3DMLoader.js').then((m) => m.Rhino3dmLoader),
+};
+
+// The rhino3dm WASM build the 3DM loader drives. It has to match the release
+// three r160 was written against — a mismatched pair is the first thing to
+// check if 3DM files stop opening after a three upgrade.
+const RHINO3DM_LIBRARY_PATH = 'https://cdn.jsdelivr.net/npm/rhino3dm@8.4.0/';
+
+// Promises, not classes: a second piece in the same format reuses the in-flight
+// import rather than starting another one
+const _loaderClasses = new Map();
+
+function getLoaderClass(key) {
+  // Statically imported at the top — OBJ is the format everything already uses
+  if (key === 'obj') return Promise.resolve(OBJLoader);
+  if (!_loaderClasses.has(key)) {
+    const load = LOADER_MODULES[key];
+    if (!load) return Promise.reject(new Error(`No loader registered for "${key}"`));
+    _loaderClasses.set(key, load());
+  }
+  return _loaderClasses.get(key);
+}
+
+// MUST stay in step with the three version in the import map in index.html — a
+// decoder from a different release can fail to match the loader.
+const DRACO_DECODER_PATH = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/';
+let _draco = null;
+
+// Draco-compressed glTF is what every optimisation tool emits — gltf-transform
+// and gltfpack both — so without this those files throw on parse. An
+// uncompressed glTF never touches it.
+async function attachDraco(gltfLoader) {
+  try {
+    if (!_draco) {
+      const { DRACOLoader } = await import('three/addons/loaders/DRACOLoader.js');
+      _draco = new DRACOLoader();
+      _draco.setDecoderPath(DRACO_DECODER_PATH);
+    }
+    gltfLoader.setDRACOLoader(_draco);
+  } catch (err) {
+    console.warn('[Engine3D] Draco decoder unavailable — compressed glTF will not load', err);
+  }
+}
+
+/** The format record for a filename, or null if the extension is not supported. */
+export function formatForFile(name) {
+  const clean = String(name || '').split(/[?#]/)[0];
+  const dot = clean.lastIndexOf('.');
+  if (dot < 0) return null;
+  const ext = clean.slice(dot + 1).toLowerCase();
+  return MODEL_FORMATS.find((f) => f.ext === ext) || null;
+}
+
+// Loaders disagree about what they hand back: glTF and Collada wrap the scene
+// in a result object, STL and PLY return bare geometry with no mesh around it.
+function loaderResultToObject(result, cacheKey) {
+  if (!result) throw new Error(`${cacheKey}: the loader returned nothing`);
+  if (result.isObject3D) return result;
+  if (result.scene && result.scene.isObject3D) return result.scene;
+
+  if (result.isBufferGeometry) {
+    const material = defaultMetalMaterial();
+    // A vertex-coloured mesh is stating its own colour, so the gold tint that
+    // suits a bare STL would fight it
+    if (result.getAttribute && result.getAttribute('color')) {
+      material.vertexColors = true;
+      material.color.setRGB(1, 1, 1);
+    }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(result, material));
+    return group;
+  }
+
+  throw new Error(`${cacheKey}: the loader returned something unrecognised`);
+}
+
+// Flattens a loaded model into the shape the rest of this file was written for:
+// one level of plain meshes, every transform identity, every geometry owned by
+// exactly one mesh.
+//
+// OBJ arrives like that already, which is why nothing downstream ever had to
+// cope with the alternative. Every other format does not:
+//
+//   · glTF, FBX, Collada, 3DS and 3MF put the model's real placement — and its
+//     unit scale, and Collada's Z-up correction — on NODE transforms, which
+//     normalizeModel wipes when it resets the root before measuring
+//   · they reuse one geometry across many nodes (the same stone repeated round
+//     a setting), so baking a transform into it moves every other copy too, and
+//     re-welding it disposes a buffer the other copies are still drawing from
+//   · gltfpack and gltf-transform emit InstancedMesh, whose copies live in an
+//     instance matrix that none of the vertex scans here read
+//
+// Doing this once at load time means the measuring, orienting, wrapping and
+// cloning that follow all see exactly what an OBJ would have given them.
+function flattenModel(root, label) {
+  root.updateMatrixWorld(true);
+
+  const meshes = [];
+  root.traverse((child) => { if (child.isMesh) meshes.push(child); });
+
+  let expanded = 0;
+  for (const mesh of meshes) {
+    // A loader root that is itself a mesh has nothing to be re-parented into
+    if (!mesh.parent) continue;
+
+    // An InstancedMesh draws N copies from one geometry; each becomes a real mesh
+    if (mesh.isInstancedMesh && mesh.count > 0) {
+      const parent = mesh.parent;
+      const m = new THREE.Matrix4();
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, m);
+        const copy = new THREE.Mesh(mesh.geometry.clone(), mesh.material);
+        // Local placement only — the bake below picks up the rest of the chain
+        m.premultiply(mesh.matrix).decompose(copy.position, copy.quaternion, copy.scale);
+        parent.add(copy);
+      }
+      parent.remove(mesh);
+      expanded += mesh.count;
+      continue;
+    }
+
+    // Nothing here is ever animated, and a skeleton only survives clone(true)
+    // half-attached. The bind pose is the pose we want, so take it as static.
+    if (mesh.isSkinnedMesh) {
+      const plain = new THREE.Mesh(mesh.geometry, mesh.material);
+      plain.name = mesh.name;
+      plain.matrix.copy(mesh.matrix);
+      plain.matrix.decompose(plain.position, plain.quaternion, plain.scale);
+      mesh.parent.add(plain);
+      mesh.parent.remove(mesh);
+    }
+  }
+
+  if (expanded) console.log(`[Engine3D] ${label}: expanded ${expanded} GPU instance(s)`);
+
+  root.updateMatrixWorld(true);
+
+  const drawn = [];
+  root.traverse((child) => { if (child.isMesh && child.geometry) drawn.push(child); });
+
+  // Every mesh must own its geometry before ANY of them is baked — cloning
+  // lazily during the bake would copy a buffer that already carries the first
+  // mesh's matrix, and the copy would then get a second transform on top
+  giveEachMeshItsOwnGeometry(drawn);
+
+  const identity = new THREE.Matrix4();
+  for (const child of drawn) {
+    // An OBJ's meshes are all identity already — nothing to bake, and no reason
+    // to push a whole vertex buffer through a no-op
+    if (child.matrixWorld.equals(identity)) continue;
+
+    child.geometry.applyMatrix4(child.matrixWorld);
+
+    // A mirrored node inverts winding; applyMatrix4 fixes the normals but not
+    // the triangle order, which single-sided shading would then get backwards
+    if (child.matrixWorld.determinant() < 0) reverseWinding(child.geometry);
+  }
+
+  root.traverse((child) => {
+    child.position.set(0, 0, 0);
+    child.rotation.set(0, 0, 0);
+    child.scale.set(1, 1, 1);
+    child.matrixAutoUpdate = true;
+  });
+  root.updateMatrixWorld(true);
+}
+
+// Splits geometry shared by several meshes, so baking one mesh's transform
+// cannot move the others
+function giveEachMeshItsOwnGeometry(meshes) {
+  const seen = new Set();
+  for (const mesh of meshes) {
+    if (seen.has(mesh.geometry)) mesh.geometry = mesh.geometry.clone();
+    else seen.add(mesh.geometry);
+  }
+}
+
+function reverseWinding(geometry) {
+  const index = geometry.getIndex();
+  if (index) {
+    const a = index.array;
+    for (let i = 0; i < a.length; i += 3) {
+      const t = a[i];
+      a[i] = a[i + 2];
+      a[i + 2] = t;
+    }
+    index.needsUpdate = true;
+    return;
+  }
+  for (const attr of Object.values(geometry.attributes)) {
+    const a = attr.array;
+    const n = attr.itemSize;
+    for (let i = 0; i + 3 * n <= a.length; i += 3 * n) {
+      for (let k = 0; k < n; k++) {
+        const t = a[i + k];
+        a[i + k] = a[i + 2 * n + k];
+        a[i + 2 * n + k] = t;
+      }
+    }
+    attr.needsUpdate = true;
+  }
+}
 
 export class Engine3D {
   constructor(canvas) {
@@ -1216,12 +1508,12 @@ export class Engine3D {
 
   // Loading
 
-  async loadJewellery(id, folder, objFile, category, onProgress) {
-    const cacheKey = `${folder}/${objFile}`;
+  async loadJewellery(id, folder, modelFile, category, onProgress) {
+    const cacheKey = `${folder}/${modelFile}`;
     if (this.modelCache.has(cacheKey)) return this.modelCache.get(cacheKey);
     if (this.pendingLoads.has(cacheKey)) return this.pendingLoads.get(cacheKey);
 
-    const job = this._loadTemplate(folder, objFile, category, cacheKey, onProgress)
+    const job = this._loadTemplate(folder, modelFile, category, cacheKey, onProgress)
       .then((template) => {
         this.modelCache.set(cacheKey, template);
         this.pendingLoads.delete(cacheKey);
@@ -1236,25 +1528,105 @@ export class Engine3D {
     return job;
   }
 
-  async _loadTemplate(folder, objFile, category, cacheKey, onProgress) {
+  // Every loader has its own parse signature and its own idea of a return
+  // value. This is the only place that knows about those differences.
+  async _parseModel(format, data, basePath, modelFile, cacheKey) {
+    const LoaderClass = await getLoaderClass(format.loader);
+    const loader = new LoaderClass();
+
+    // Where a loader goes looking for the textures a model references
+    if (typeof loader.setPath === 'function') loader.setPath(basePath);
+    if (typeof loader.setResourcePath === 'function') loader.setResourcePath(basePath);
+
+    // OBJ keeps the path it always had: its materials live in a separate MTL
+    // that must be attached before parsing, and the text needs repairing first
+    if (format.loader === 'obj') {
+      const text = sanitizeObjText(data, cacheKey);
+      const materials = await this._loadMaterials(basePath, modelFile, text);
+      if (materials) loader.setMaterials(materials);
+      return {
+        object: loaderResultToObject(loader.parse(text), cacheKey),
+        hasMaterials: !!materials,
+      };
+    }
+
+    if (format.loader === 'gltf') {
+      await attachDraco(loader);
+      // Asynchronous parse, like 3DM below — the rest are synchronous
+      const result = await new Promise((resolve, reject) => {
+        loader.parse(data, basePath, resolve, reject);
+      });
+      return { object: loaderResultToObject(result, cacheKey), hasMaterials: true };
+    }
+
+    if (format.loader === '3dm') {
+      loader.setLibraryPath(RHINO3DM_LIBRARY_PATH);
+      try {
+        const result = await new Promise((resolve, reject) => {
+          loader.parse(data, resolve, reject);
+        });
+        return { object: loaderResultToObject(result, cacheKey), hasMaterials: true };
+      } finally {
+        // Rhino3dmLoader runs a worker per instance; without this each piece
+        // loaded would leave one behind for the life of the page
+        if (typeof loader.dispose === 'function') loader.dispose();
+      }
+    }
+
+    return {
+      object: loaderResultToObject(loader.parse(data, basePath), cacheKey),
+      // Everything that is not OBJ arrives carrying a material already — either
+      // its own, or the one loaderResultToObject puts on bare geometry
+      hasMaterials: true,
+    };
+  }
+
+  async _loadTemplate(folder, modelFile, category, cacheKey, onProgress) {
     const basePath = `${OBJECTS_BASE}${folder}/`;
 
-    // Fetch the OBJ once, with progress
-    const raw = await fetchTextWithProgress(`${basePath}${objFile}`, onProgress);
-    const objText = sanitizeObjText(raw, cacheKey);
+    const format = formatForFile(modelFile);
+    if (!format) {
+      throw new Error(
+        `${cacheKey}: "${modelFile}" is not a format this project can open. `
+        + `Supported: ${MODEL_EXTENSIONS.join(', ')}. `
+        + 'STEP, IGES, .blend and .ztl have to be converted first.',
+      );
+    }
 
-    // Every loader is a fresh instance
-    const objLoader = new OBJLoader();
-    const materials = await this._loadMaterials(basePath, objFile, objText);
-    if (materials) objLoader.setMaterials(materials);
+    // One fetch, with progress. Text formats decode to a string; the rest stay
+    // as an ArrayBuffer, which is what their loaders want.
+    const data = await fetchModelData(`${basePath}${modelFile}`, format.binary, onProgress);
 
-    const object = objLoader.parse(objText);
+    const { object, hasMaterials } = await this._parseModel(
+      format, data, basePath, modelFile, cacheKey,
+    );
+
+    if (format.warn) console.warn(`[Engine3D] ${cacheKey}: ${format.warn}`);
+
+    // A file can open cleanly and still hold nothing drawable. Rhino is the
+    // usual reason — it stores NURBS surfaces, and one saved without render
+    // meshes parses into an empty scene. Left alone, that piece would just
+    // never appear on camera with no clue as to why.
+    let meshes = 0;
+    object.traverse((child) => { if (child.isMesh) meshes++; });
+    if (!meshes) {
+      throw new Error(
+        `${cacheKey}: the file opened but holds no meshes to draw.`
+        + (format.ext === '3dm'
+          ? ' Rhino saved it as NURBS surfaces only. Re-save it from Rhino with render'
+            + ' meshes included, or export the piece as OBJ, STL or GLB instead.'
+          : ' Re-export it from the tool that made it.'),
+      );
+    }
+
+    // Everything downstream assumes an OBJ's flat, identity-transform hierarchy
+    flattenModel(object, cacheKey);
 
     // Per-folder material overrides, read before the traverse so every mesh in the model…
     const materialOptions = {
       maxAnisotropy: this.maxAnisotropy,
       override: MODEL_TUNING[folder] || {},
-      hasMTL: !!materials,
+      hasMTL: hasMaterials,
     };
 
     object.traverse((child) => {
@@ -1286,6 +1658,8 @@ export class Engine3D {
       // Carried so the tuner can show only the controls that apply to this kind of piece
       category,
       ...CATEGORY_DEFAULTS[category],
+      // Every format is oriented the same way; a format may still opt out here
+      ...(format.autoOrient === false ? { autoOrient: false } : {}),
       ...(MODEL_TUNING[folder] || {}),
     };
 
@@ -1298,20 +1672,23 @@ export class Engine3D {
     );
 
     console.log('[Engine3D] loaded', cacheKey, {
+      format: format.label,
       rawSize: analysis.rawSize.toArray().map((n) => +n.toFixed(3)),
       normSize: analysis.normSize.toArray().map((n) => +n.toFixed(3)),
       fitAxis: tuning.fitAxis,
       anchor: tuning.anchor,
+      autoOrient: tuning.autoOrient !== false,
     });
 
     return { object, analysis, category, cacheKey, folder, tuning, anchorOffset };
   }
 
-  async _loadMaterials(basePath, objFile, objText) {
+  // OBJ only — the one supported format that keeps its materials in a separate file
+  async _loadMaterials(basePath, modelFile, objText) {
     const names = [];
     const declared = objText.match(/^\s*mtllib\s+(.+)$/m);
     if (declared) names.push(declared[1].trim());
-    names.push('model.mtl', objFile.replace(/\.obj$/i, '.mtl'));
+    names.push('model.mtl', modelFile.replace(/\.obj$/i, '.mtl'));
 
     for (const name of [...new Set(names)]) {
       try {
@@ -1582,6 +1959,50 @@ export class Engine3D {
     return worst;
   }
 
+  // The same question asked of the whole hand rather than its palm centre: how
+  // much of this point is behind ANY part of a tracked hand, 0 to 1.
+  //
+  // An ear is covered from every direction — cupped, scratched, hair pushed back —
+  // and in most of those the palm centre is nowhere near the lobe while a finger
+  // is sitting right on top of it. So the distance is taken to the NEAREST point
+  // of the hand outline, which is what actually does the hiding. Depth is left
+  // out on purpose: MediaPipe's hand z and face z come from different solves and
+  // are not comparable, and a hand held up beside a head is in front of it
+  // essentially every time.
+  _handOutlineCoverage(point, tracking, skip) {
+    if (!tracking) return 0;
+    let worst = 0;
+
+    for (const hand of [tracking.leftHand, tracking.rightHand]) {
+      if (!hand || hand === skip || hand.length < 21) continue;
+
+      // Knuckle span, the same yardstick the palm-centre test uses, so both
+      // scale with how close the hand is to the camera
+      this.lmToScreen(hand[HAND.indexMcp], _hcIndex);
+      this.lmToScreen(hand[HAND.pinkyMcp], _hcPinky);
+      const span = _hcIndex.distanceTo(_hcPinky);
+      if (span < 1e-3) continue;
+
+      let nearest = Infinity;
+      for (const i of HAND_OUTLINE) {
+        const lm = hand[i];
+        if (!lm) continue;
+        this.lmToScreen(lm, _hcPoint);
+        const d = Math.hypot(point.x - _hcPoint.x, point.y - _hcPoint.y);
+        if (d < nearest) nearest = d;
+      }
+      if (!Number.isFinite(nearest)) continue;
+
+      // Flesh reaches past the bone landmarks, hence a reach rather than zero
+      const reach = span * PLACE.earHandReach;
+      const fade = Math.max(span * PLACE.earHandFade, 1e-3);
+
+      const cover = clamp01((reach - nearest) / fade);
+      if (cover > worst) worst = cover;
+    }
+    return worst;
+  }
+
   // Has this anchor left the picture? MediaPipe does not report a landmark as missing…
   _outOfFrame(position, scale) {
     const margin = Math.max(scale, 1) * OFFSCREEN_MARGIN;
@@ -1817,7 +2238,9 @@ export class Engine3D {
     // Multiplied by the head pose's own confidence
     this._markAnchor(`ear${side}`, _pos, side > 0 ? 0x00ff66 : 0x00ddff);
 
-    const covered = this._handCoverage(_pos, this._tracking, null);
+    // A hand at the ear hides the ear, and an ear you cannot see wears no
+    // earring — so this is a hard gate, not a dimming
+    const covered = this._handOutlineCoverage(_pos, this._tracking, null);
 
     const alpha = (this._outOfFrame(_pos, scale) ? 0 : turned)
       * hp.confidence
@@ -2956,13 +3379,17 @@ function measureFrontRise(object, radius) {
 function bakeTransformIntoGeometry(object) {
   object.updateMatrixWorld(true);
 
-  const done = new Set();
-  object.traverse((child) => {
-    if (!child.isMesh || !child.geometry || done.has(child.geometry)) return;
-    done.add(child.geometry);
+  // Shared geometry is split rather than skipped: baking one mesh's matrix into
+  // a buffer two meshes draw from would move both, and skipping the second then
+  // zeroing its transform below would drop it onto the first one
+  const drawn = [];
+  object.traverse((child) => { if (child.isMesh && child.geometry) drawn.push(child); });
+  giveEachMeshItsOwnGeometry(drawn);
+
+  for (const child of drawn) {
     rememberBaseGeometry(child.geometry);
     child.geometry.applyMatrix4(child.matrixWorld);
-  });
+  }
 
   object.traverse((child) => {
     child.position.set(0, 0, 0);
@@ -3344,7 +3771,7 @@ function scrubNaNVertices(geometry, label) {
     pos.needsUpdate = true;
     console.warn(
       `[Engine3D] ${label}: ${bad} invalid vertex value(s) were zeroed. ` +
-      'The OBJ file is malformed — re-export it if the model looks wrong.',
+      'The model file is malformed — re-export it if the model looks wrong.',
     );
   }
 }
@@ -3483,17 +3910,29 @@ function toPBRMaterial(src, options) {
 
   if (!src) return applyMaterialOverride(defaultMetalMaterial(), override);
 
-  const tuneTexture = (tex) => {
+  const tuneTexture = (tex, colour) => {
     if (!tex) return tex;
     tex.anisotropy = Math.min(maxAnisotropy, 8);
+    // FBX, Collada and 3DS hand back colour maps still tagged linear, which
+    // renders them washed out. A colour map is sRGB whatever wrote it.
+    if (colour && 'colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   };
 
   if (src.isMeshStandardMaterial || src.isMeshPhysicalMaterial) {
     // Already PBR — respect it, and only make sure it fits the scene
     src.side = THREE.DoubleSide;
-    tuneTexture(src.map);
-    if (src.envMapIntensity === undefined) src.envMapIntensity = ENV_INTENSITY;
+    tuneTexture(src.map, true);
+    tuneTexture(src.emissiveMap, true);
+    // three's own default, i.e. the file said nothing. The scene's probe is a
+    // small dim one, so metal left at 1 reads flat next to an OBJ piece.
+    if (src.envMapIntensity === undefined || src.envMapIntensity === 1) {
+      src.envMapIntensity = ENV_INTENSITY;
+    }
+    // Same gemstone treatment a transparent MTL gets, so a GLB stone sparkles
+    if (src.transparent && src.opacity < 0.95) {
+      src.envMapIntensity = ENV_INTENSITY * 1.4;
+    }
     return applyMaterialOverride(src, override);
   }
 
@@ -3502,10 +3941,12 @@ function toPBRMaterial(src, options) {
 
   // Colour, exactly as authored
   if (src.color) out.color.copy(src.color);
-  out.map = tuneTexture(src.map || null);
+  out.map = tuneTexture(src.map || null, true);
+  // PLY and some FBX exports state their colour per vertex instead
+  out.vertexColors = src.vertexColors === true;
 
   if (src.emissive && out.emissive) out.emissive.copy(src.emissive);
-  out.emissiveMap = src.emissiveMap || null;
+  out.emissiveMap = tuneTexture(src.emissiveMap || null, true);
   out.alphaMap = src.alphaMap || null;
   // Deliberately not carrying aoMap across:
 
@@ -3531,7 +3972,7 @@ function toPBRMaterial(src, options) {
     out.specularIntensity = Math.min(Math.max(lum * 2.0, 0.2), 2);
   }
   if (src.specularMap && 'specularColorMap' in out) {
-    out.specularColorMap = tuneTexture(src.specularMap);
+    out.specularColorMap = tuneTexture(src.specularMap, true);
   }
 
   // Blinn-Phong exponent → roughness, by the usual approximation
@@ -3797,14 +4238,17 @@ function assetVersionSuffix(headers) {
   return validator ? `?v=${versionToken(validator)}` : '';
 }
 
-async function fetchTextWithProgress(rawUrl, onProgress) {
+// One fetch with progress, for either kind of model file. A text format is
+// decoded to a string; a binary one is handed back as an ArrayBuffer, which is
+// what its loader expects.
+async function fetchModelData(rawUrl, binary, onProgress) {
   const url = await versionedUrl(rawUrl);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${res.status} ${res.statusText} — ${url}`);
 
   const total = Number(res.headers.get('content-length')) || 0;
   if (!res.body || !total || typeof onProgress !== 'function') {
-    return res.text();
+    return binary ? res.arrayBuffer() : res.text();
   }
 
   const reader = res.body.getReader();
@@ -3824,28 +4268,46 @@ async function fetchTextWithProgress(rawUrl, onProgress) {
     merged.set(c, at);
     at += c.length;
   }
-  return new TextDecoder().decode(merged);
+  return binary ? merged.buffer : new TextDecoder().decode(merged);
 }
 
 // Catalogue
 
-const OBJ_CANDIDATES = ['model.obj', 'scene.obj', '1.obj', '2.obj', '3.obj'];
-
-export async function resolveObjFile(folder) {
-  for (const name of [...OBJ_CANDIDATES, `${folder}.obj`]) {
-    try {
-      // no-cache, so a folder that has just had its first model dropped in is not reported empty
-      const res = await fetch(`${OBJECTS_BASE}${folder}/${name}`, { method: 'HEAD', cache: 'no-cache' });
-      if (res.ok) return name;
-    } catch {
-      // try the next candidate
+/**
+ * The model file inside a folder, or null if there is none this engine can
+ * open. Formats are tried in MODEL_FORMATS order, so a folder holding both a
+ * GLB and an OBJ serves the GLB.
+ *
+ * Probing costs one HEAD request per candidate, and it stops at the first hit —
+ * a folder with model.glb costs one, model.obj costs seven. A folder with no
+ * model at all is the worst case, and that is the case the manifest's own
+ * `model` field exists to skip; see readManifest.
+ */
+export async function resolveModelFile(folder) {
+  const tried = new Set();
+  for (const format of MODEL_FORMATS) {
+    for (const stem of [...(format.stems || DEFAULT_STEMS), folder]) {
+      const name = `${stem}.${format.ext}`;
+      if (tried.has(name)) continue;
+      tried.add(name);
+      try {
+        // no-cache, so a folder that has just had its first model dropped in is not reported empty
+        const res = await fetch(`${OBJECTS_BASE}${folder}/${name}`, { method: 'HEAD', cache: 'no-cache' });
+        if (res.ok) return name;
+      } catch {
+        // try the next candidate
+      }
     }
   }
   return null;
 }
 
-export async function probeFolder(folder) {
-  const objFile = await resolveObjFile(folder);
+/**
+ * @param {string} folder
+ * @param {string} [knownModel] filename from the manifest, which skips probing
+ */
+export async function probeFolder(folder, knownModel) {
+  const modelFile = knownModel || await resolveModelFile(folder);
   let image = null;
   for (const name of ['demo.jpg', 'demo.jpeg', 'demo.png', 'demo.webp', 'preview.jpg', 'preview.png']) {
     try {
@@ -3859,8 +4321,8 @@ export async function probeFolder(folder) {
       // next candidate
     }
   }
-  return objFile
-    ? { folder, objFile, available: true, image }
+  return modelFile
+    ? { folder, modelFile, available: true, image }
     : { folder, available: false, image };
 }
 
@@ -3901,6 +4363,12 @@ async function readManifest() {
           folder: item.folder.trim(),
           category: typeof item.category === 'string' ? item.category.trim() : undefined,
           label: typeof item.label === 'string' ? item.label.trim() : undefined,
+          // Written by a host that scans the folders itself. When it is present
+          // the browser skips probing entirely — it already knows the filename
+          // and the extension, which matters now that there are ten to try.
+          model: typeof item.model === 'string' && item.model.trim()
+            ? item.model.trim()
+            : undefined,
         });
       }
     }
@@ -3924,13 +4392,14 @@ export async function discoverItems() {
       );
       return null;
     }
-    const found = await probeFolder(entry.folder);
+    const found = await probeFolder(entry.folder, entry.model);
     return {
       id: entry.folder,
       folder: entry.folder,
       category,
       label: entry.label || folderToLabel(entry.folder, category),
-      objFile: found.objFile,
+      modelFile: found.modelFile,
+      format: found.modelFile ? formatForFile(found.modelFile) : null,
       available: found.available,
       image: found.image || null,
     };

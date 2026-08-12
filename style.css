@@ -960,19 +960,28 @@ body {
   .viewport-wrapper { --vto-cam-h: min(68dvh, 620px); }
 }
 
-/* Small phones: the three camera buttons share the row evenly instead of one
-   of them wrapping onto a line of its own. */
+/* Small phones: two buttons on the first row, and the screenshot button takes a
+   row of its own. Three equal columns left it ~110px wide, which is narrower
+   than "Capture Screenshot" can set on one line — so the label spilled out of
+   the pill. A full-width row fits it without shrinking the type. */
 @media (max-width: 480px) {
   .camera-controls {
-    gap: 0.45rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
   }
 
   .camera-controls .btn-action {
-    flex: 1 1 0;
+    width: 100%;
     min-width: 0;
-    padding: 0.7rem 0.45rem;
-    font-size: 0.76rem;
+    min-height: 44px;
+    padding: 0.72rem 0.5rem;
+    font-size: 0.74rem;
     letter-spacing: 0.01em;
+  }
+
+  .camera-controls #btn-screenshot {
+    grid-column: 1 / -1;
   }
 }
 
@@ -1056,6 +1065,9 @@ body {
   .camera-controls {
     grid-column: 2;
     grid-row: 1;
+    /* Restated: the narrow-phone block above switches this to a grid, and a
+       small phone held sideways can match both queries. */
+    display: flex;
     flex-direction: column;
     flex-wrap: nowrap;
     gap: 0.45rem;
@@ -1164,5 +1176,131 @@ body {
     font-size: 0.66rem;
     letter-spacing: 0.03em;
     gap: 0.4rem;
+  }
+}
+
+/* ============================================================
+   PHONE, PORTRAIT
+   Everything below is scoped to narrow screens. A landscape phone is wider
+   than 767px, so it keeps the side-by-side layout further up, and nothing
+   here can reach a desktop.
+   ============================================================ */
+
+@media (max-width: 767px) {
+  /* Nothing may set its own width wider than the screen. */
+  .main,
+  .vto-view,
+  .product-grid,
+  .product-detail-panel {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* A theme that puts `white-space: nowrap` on every button would push the
+     longest label out through the side of the pill. */
+  .camera-controls .btn-action {
+    white-space: normal;
+    overflow-wrap: break-word;
+    line-height: 1.25;
+  }
+
+  /* DETAIL SHEET
+     A 1:1 photograph plus the lead plus three stacked bullets ran past the
+     bottom of the screen, so the Try On button needed a scroll to reach. The
+     photograph is shallower here, the lead is capped, and the bullets read as
+     one wrapped row of pills instead of three lines. */
+  .product-sheet__media {
+    aspect-ratio: 4 / 3;
+    max-height: 40vh;
+  }
+
+  .product-sheet__body {
+    padding: 0.85rem 0.95rem 1rem;
+  }
+
+  .product-sheet__title {
+    margin-bottom: 0.45rem;
+  }
+
+  .product-sheet__lead {
+    font-size: 0.8rem;
+    line-height: 1.5;
+    margin-bottom: 0.6rem;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+
+  .product-sheet__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.35rem;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    list-style: none;
+    font-size: 0.7rem;
+  }
+
+  .product-sheet__list li {
+    margin: 0;
+    padding: 0.26rem 0.6rem;
+    border: 1px solid rgba(var(--gold-rgb), 0.3);
+    border-radius: 999px;
+    color: var(--gold-light);
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  /* TRY ON SCREEN
+     The back button, the piece name and the camera were stacked on gaps meant
+     for a desktop row, which read as one crowded block on a phone. */
+  .vto-view--tryon {
+    padding-top: 0.5rem;
+  }
+
+  .tryon-topbar {
+    gap: 0.7rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .tryon-piece-label {
+    font-size: clamp(1.15rem, 5.2vw, 1.5rem);
+    line-height: 1.35;
+    letter-spacing: 0.04em;
+  }
+
+  .tryon-piece-label::after {
+    margin-top: 0.55rem;
+  }
+
+  .camera-section {
+    gap: 1.15rem;
+  }
+
+  .camera-placeholder p {
+    line-height: 1.6;
+  }
+
+  .vto-finger-picker .vto-finger-hint {
+    padding: 0.65rem 1rem;
+    font-size: 0.76rem;
+    line-height: 1.5;
+  }
+
+  /* Collection: the tile caption was set for a wider plate. */
+  .vto-view--home {
+    padding-top: 0.55rem;
+  }
+
+  .product-shelf__title {
+    margin-bottom: 0.95rem;
+    line-height: 1.25;
+  }
+
+  .product-tile .product-tile__name {
+    padding: 2rem 0.55rem 0.6rem;
+    line-height: 1.35;
+    letter-spacing: 0.045em;
   }
 }
