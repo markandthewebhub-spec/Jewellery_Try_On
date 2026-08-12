@@ -66,6 +66,12 @@ const HAND = {
 // The four knuckles, index to pinky — the fan the palm's own frame is fitted to
 const MCP_ROW = [5, 9, 13, 17];
 
+// Enough of the hand to stand in for its outline: the wrist, the thumb chain,
+// every knuckle, and each finger's middle joint and tip. A palm-centre-only test
+// misses a hand cupped over an ear, where the fingers do the covering and the
+// palm centre sits a whole hand-width away down by the jaw.
+const HAND_OUTLINE = [0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18, 20];
+
 // Finger chains, as [knuckle, middle joint, tip]
 const FINGER_CHAINS = [
   [5, 6, 8],     // index
@@ -131,6 +137,10 @@ const PLACE = {
   earringLobeDrop: 0.18,
   earringLobeOut: 0.14,
   earringLobeBack: 0.08,
+  // A hand raised to the ear hides the earring — measured against the whole
+  // hand outline, in knuckle spans, not just its palm centre
+  earHandReach: 0.55,
+  earHandFade: 0.35,
   // Earring orientation
   earringRollFollow: 0.55,
   earringHeadFollow: 0.82,
@@ -624,6 +634,7 @@ const _hcIndex = new THREE.Vector3();
 const _hcPinky = new THREE.Vector3();
 const _hcMiddle = new THREE.Vector3();
 const _hcPalm = new THREE.Vector3();
+const _hcPoint = new THREE.Vector3();
 
 // Builds a guaranteed-orthonormal rotation from a primary axis plus a rough secondary…
 function basisQuat(primaryUp, refFwd, outQuat) {
@@ -1948,6 +1959,50 @@ export class Engine3D {
     return worst;
   }
 
+  // The same question asked of the whole hand rather than its palm centre: how
+  // much of this point is behind ANY part of a tracked hand, 0 to 1.
+  //
+  // An ear is covered from every direction — cupped, scratched, hair pushed back —
+  // and in most of those the palm centre is nowhere near the lobe while a finger
+  // is sitting right on top of it. So the distance is taken to the NEAREST point
+  // of the hand outline, which is what actually does the hiding. Depth is left
+  // out on purpose: MediaPipe's hand z and face z come from different solves and
+  // are not comparable, and a hand held up beside a head is in front of it
+  // essentially every time.
+  _handOutlineCoverage(point, tracking, skip) {
+    if (!tracking) return 0;
+    let worst = 0;
+
+    for (const hand of [tracking.leftHand, tracking.rightHand]) {
+      if (!hand || hand === skip || hand.length < 21) continue;
+
+      // Knuckle span, the same yardstick the palm-centre test uses, so both
+      // scale with how close the hand is to the camera
+      this.lmToScreen(hand[HAND.indexMcp], _hcIndex);
+      this.lmToScreen(hand[HAND.pinkyMcp], _hcPinky);
+      const span = _hcIndex.distanceTo(_hcPinky);
+      if (span < 1e-3) continue;
+
+      let nearest = Infinity;
+      for (const i of HAND_OUTLINE) {
+        const lm = hand[i];
+        if (!lm) continue;
+        this.lmToScreen(lm, _hcPoint);
+        const d = Math.hypot(point.x - _hcPoint.x, point.y - _hcPoint.y);
+        if (d < nearest) nearest = d;
+      }
+      if (!Number.isFinite(nearest)) continue;
+
+      // Flesh reaches past the bone landmarks, hence a reach rather than zero
+      const reach = span * PLACE.earHandReach;
+      const fade = Math.max(span * PLACE.earHandFade, 1e-3);
+
+      const cover = clamp01((reach - nearest) / fade);
+      if (cover > worst) worst = cover;
+    }
+    return worst;
+  }
+
   // Has this anchor left the picture? MediaPipe does not report a landmark as missing…
   _outOfFrame(position, scale) {
     const margin = Math.max(scale, 1) * OFFSCREEN_MARGIN;
@@ -2183,7 +2238,9 @@ export class Engine3D {
     // Multiplied by the head pose's own confidence
     this._markAnchor(`ear${side}`, _pos, side > 0 ? 0x00ff66 : 0x00ddff);
 
-    const covered = this._handCoverage(_pos, this._tracking, null);
+    // A hand at the ear hides the ear, and an ear you cannot see wears no
+    // earring — so this is a hard gate, not a dimming
+    const covered = this._handOutlineCoverage(_pos, this._tracking, null);
 
     const alpha = (this._outOfFrame(_pos, scale) ? 0 : turned)
       * hp.confidence

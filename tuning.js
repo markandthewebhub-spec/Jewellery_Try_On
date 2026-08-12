@@ -21,6 +21,7 @@ const FIELDS = [
 
   // Earring-only
   { key: 'earDrop', label: 'Ear ↓', min: -0.8, max: 1.2, step: 0.01, def: 0.18, only: 'earring', group: 'Earring fit' },
+  // Defaults must match PLACE.earringLobe* in engine3d.js, or Reset and Copy config lie
   { key: 'earOut', label: 'Ear ↔', min: -0.4, max: 0.8, step: 0.01, def: 0.14, only: 'earring', group: 'Earring fit' },
   { key: 'earBack', label: 'Ear ↕ depth', min: -0.6, max: 0.6, step: 0.01, def: 0.08, only: 'earring', group: 'Earring fit' },
 ];
