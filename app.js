@@ -4,6 +4,7 @@ import {
   Engine3D,
   CATEGORY_LABELS,
   CATEGORY_ORDER,
+  MODEL_EXTENSIONS,
   RING_FINGERS,
   discoverItems,
 } from 'vto/engine3d.js';
@@ -175,8 +176,9 @@ async function discoverCatalogue() {
   const missing = catalogue.filter((c) => !c.available).map((c) => c.folder);
   if (missing.length) {
     console.warn(
-      `[Catalogue] no model found in: ${missing.join(', ')}\n` +
-      'Drop a model.obj into objects/<folder>/ to enable those buttons.',
+      `[Catalogue] no model found in: ${missing.join(', ')}\n`
+      + `Drop a model file into objects/<folder>/ — ${MODEL_EXTENSIONS.join(', ')} are all read, `
+      + 'and a file named model.<ext> is found fastest.',
     );
   }
 }
@@ -582,7 +584,7 @@ async function toggleJewellery(item, btn) {
     const template = await engine.loadJewellery(
       item.id,
       item.folder,
-      item.objFile,
+      item.modelFile,
       item.category,
       (fraction) => showLoading(`Loading ${item.label}… ${Math.round(fraction * 100)}%`),
     );
@@ -912,13 +914,13 @@ async function init() {
 }
 
 async function preloadBootItem(item) {
-  if (!item?.available || !item.objFile) return;
+  if (!item?.available || !item.modelFile) return;
   try {
     showLoading(`Preparing ${item.label}…`);
     await engine.loadJewellery(
       item.id,
       item.folder,
-      item.objFile,
+      item.modelFile,
       item.category,
       (fraction) => showLoading(`Preparing ${item.label}… ${Math.round(fraction * 100)}%`),
     );
