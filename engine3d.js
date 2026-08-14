@@ -526,9 +526,14 @@ export const OBJECTS_BASE = (() => {
 
 // PER-FOLDER TUNING
 
+// Keyed by folder name, so an entry outlives the model it was measured against:
+// drop a new file into an old folder and it silently inherits the old rotation.
+// That is exactly what put ring-solitaire's diamond round the back — the 180°
+// belonged to the OBJ that used to live there, and the engine's own face-flip
+// test already turns the replacement the right way.
 export const MODEL_TUNING = {
   'ring-band': { offsetY: 0.15, rotY: 180},
-  'ring-solitaire': { offsetY: 0.15, rotY: 180},
+  'ring-solitaire': { offsetY: 0.15 },
 };
 
 // Anything set with ?tune=1 is also written to localStorage and re-applied on the next…
@@ -784,6 +789,21 @@ export const MODEL_FORMATS = [
     // so plainly, rather than leaving a piece that silently never appears.
     warn: 'Rhino files save NURBS surfaces; if this one has no render meshes saved with it, nothing will be drawn.',
   },
+  {
+    // A flat cut-out, for the piece that has a picture and no model yet. It is
+    // drawn on a plane the shape of the image and tracked like anything else, so
+    // it follows the neck or the hand — but it stays flat, so turning your head
+    // does not turn it. Last in this list on purpose: a folder holding a real
+    // model as well always serves the model.
+    //
+    // PNG only, and it wants a transparent background. A photo with its
+    // background still on shows up as a rectangle hanging in mid-air.
+    ext: 'png', label: 'PNG cut-out', loader: 'image', binary: true, materials: 'image',
+    // A plane's thinnest axis already faces the camera, and the bounding-box
+    // guess would lay it flat for a ring — edge on, which is invisible.
+    autoOrient: false,
+    warn: 'PNG is a flat cut-out, not a model: it follows the tracking but has no depth, and it needs a transparent background.',
+  },
 ];
 
 // Filenames probed inside a folder, before the folder's own name is tried
@@ -845,6 +865,73 @@ async function attachDraco(gltfLoader) {
   } catch (err) {
     console.warn('[Engine3D] Draco decoder unavailable — compressed glTF will not load', err);
   }
+}
+
+// Decodes the bytes of an image. createImageBitmap is the cheap path; the
+// <img> fallback is for the browsers that still lack it.
+async function decodeImage(data, cacheKey) {
+  const blob = new Blob([data]);
+  if (typeof createImageBitmap === 'function') {
+    try {
+      // Flipped here, not by the texture: WebGL cannot flip an ImageBitmap on
+      // upload, so a texture left to do it renders the picture upside down
+      return await createImageBitmap(blob, { imageOrientation: 'flipY' });
+    } catch (err) {
+      console.warn(`[Engine3D] ${cacheKey}: createImageBitmap failed, falling back to <img>`, err);
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  try {
+    return await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`${cacheKey}: the image could not be decoded`));
+      img.src = url;
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Enough segments to make the neck wrap read as a curve, cheap enough not to matter
+const IMAGE_PLANE_SEGMENTS = 48;
+
+/**
+ * Turns an image into a plane the same shape as it, so a picture can stand in
+ * for a model. The plane is one unit tall and as wide as the image's aspect
+ * ratio; normalizeModel rescales it from there like any other piece.
+ */
+async function imageToObject(data, cacheKey) {
+  const image = await decodeImage(data, cacheKey);
+  const width = image.width || 1;
+  const height = image.height || 1;
+
+  const texture = new THREE.Texture(image);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  // An ImageBitmap arrives already the right way up, an <img> does not
+  texture.flipY = typeof ImageBitmap === 'undefined' || !(image instanceof ImageBitmap);
+  texture.needsUpdate = true;
+
+  // Basic, not physical: the picture already carries its own light, and lighting
+  // it a second time turns a gold cut-out grey. toPBRMaterial leaves it alone.
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    // Cuts the fully clear border away instead of blending it, which is what
+    // stops a faint square edge showing around the piece
+    alphaTest: 0.02,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  });
+  material.userData.flatImage = true;
+
+  // Segmented, not a bare quad: a necklace gets bent around the neck vertex by
+  // vertex, and four corners cannot describe a curve
+  const geometry = new THREE.PlaneGeometry(width / height, 1, IMAGE_PLANE_SEGMENTS, 12);
+  const group = new THREE.Group();
+  group.add(new THREE.Mesh(geometry, material));
+  return group;
 }
 
 /** The format record for a filename, or null if the extension is not supported. */
@@ -1531,6 +1618,11 @@ export class Engine3D {
   // Every loader has its own parse signature and its own idea of a return
   // value. This is the only place that knows about those differences.
   async _parseModel(format, data, basePath, modelFile, cacheKey) {
+    // An image has no three loader behind it — it becomes a plane instead
+    if (format.loader === 'image') {
+      return { object: await imageToObject(data, cacheKey), hasMaterials: true };
+    }
+
     const LoaderClass = await getLoaderClass(format.loader);
     const loader = new LoaderClass();
 
@@ -2123,6 +2215,10 @@ export class Engine3D {
     // Occluder: the mask IS the neck, and a wrapped chain lies on the neck
     const st = inst.state;
     const necklaceRadius = openWidth * 0.5 * scale;
+
+    // A cut-out lands exactly on the mask's own radius and vanishes inside it,
+    // and nothing about a single surface is ever behind the neck
+    if (entry.analysis?.flat) return true;
 
     // A model that was never wrapped has only an estimated chain radius
     const wrapped = !!entry.analysis?.wrapped;
@@ -3238,8 +3334,15 @@ function normalizeModel(object, category, tuning) {
     outerRadius: hoop ? hoop.outerRadius : normSize.x * 0.5,
     // Did this necklace get bent onto a cylinder? Its occluder depends on it
     wrapped,
+    // A cut-out has no thickness, so it wraps to exactly the neck occluder's
+    // own radius and the mask swallows it whole. updateNecklace skips the mask
+    // for these — there is no "behind" on something one layer thick.
+    flat: normSize.z < FLAT_PIECE_DEPTH,
   };
 }
+
+// Below this normalised depth a piece is a single surface, not a solid
+const FLAT_PIECE_DEPTH = 1e-3;
 
 // Inner and outer radius of a hoop, about its own axis, in normalised units
 function measureHoopRadii(object) {
@@ -3909,6 +4012,10 @@ function toPBRMaterial(src, options) {
   const override = options?.override || {};
 
   if (!src) return applyMaterialOverride(defaultMetalMaterial(), override);
+
+  // A flat cut-out is a photograph: it is already lit, and it has no metalness
+  // or roughness to set. Converting it would only turn it grey.
+  if (src.userData && src.userData.flatImage) return src;
 
   const tuneTexture = (tex, colour) => {
     if (!tex) return tex;
